@@ -56,6 +56,20 @@ export const ComponentsEditor = (props: ComponentsEditorProps) => {
     loadData();
   }, [props.projectId]);
 
+  const determineSelectedOptions = (): Option[] => {
+    // console.log(`ComponentsEditor.determineSelectedOptions: props.value = ${JSON.stringify(props.value)}`);
+    const selectedOptions: Option[] = [];
+    if (props.value && props.value.componentIds) {
+      for (const componentsOption of componentsOptions) {
+        if (componentsOption.value && props.value.componentIds.includes(componentsOption.value)) {
+          // console.log(`ComponentsEditor.determineSelectedOptions: Adding option ${componentsOption.label} / ${componentsOption.value}`);
+          selectedOptions.push(componentsOption);
+        }
+      }
+    }
+    return selectedOptions;
+  }
+
   const onComponentsSelect = (selectedOptions: Option[]) => {
     const fixVersionEditorValue: ComponentsEditorValue = {
       componentIds: selectedOptions.map(option => option.value),
@@ -95,6 +109,7 @@ export const ComponentsEditor = (props: ComponentsEditorProps) => {
           isDisabled={props.isDisabled}
           isInvalid={props.isInvalid}
           defaultOptions={componentsOptions}
+          value={determineSelectedOptions()}
           menuPortalTarget={props.menuPortalTarget}
           onChange={onComponentsSelect}
         />
