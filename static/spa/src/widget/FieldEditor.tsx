@@ -423,7 +423,17 @@ export const FieldEditor = (props: FieldEditorProps) => {
   }
 
   const renderComponentsFieldEditor = () => {
-    const initialValue = props.maybeEditValue?.value;
+    let initialValue: ComponentsEditorValue | undefined = undefined;
+    if (props.maybeEditValue) {
+      // const editValue = props.maybeEditValue.value as FieldEditValue;
+      const editValue = props.maybeEditValue as FieldEditValue;
+      // console.log(`FieldEditor.renderComponentsFieldEditor: editValue = ${JSON.stringify(editValue)}`);
+      initialValue = {
+        componentIds: editValue.value || [],
+        multiSelectFieldOption: editValue.multiSelectFieldOption || 'ADD'
+      };
+    }
+    // console.log(`FieldEditor.renderComponentsFieldEditor: initialValue = ${JSON.stringify(initialValue)}`);
     const projectIds: string[] = [];
     if (props.issueSelectionState && props.issueSelectionState.selectedIssues) {
       for (const issue of props.issueSelectionState.selectedIssues) {
@@ -442,6 +452,7 @@ export const FieldEditor = (props: FieldEditorProps) => {
             isDisabled={!props.enabled}
             isInvalid={!operationOutcome.success}
             menuPortalTarget={document.body}
+            value={initialValue}
             onChange={(componentsEditorValue: ComponentsEditorValue) => {
               const newValue: FieldEditValue = {
                 value: componentsEditorValue.componentIds,
