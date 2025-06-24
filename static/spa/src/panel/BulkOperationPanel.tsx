@@ -789,7 +789,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
         <div style={{marginBottom: '20px', marginTop: '20px'}}>
           <PanelMessage
             className="info-banner"
-            message={`Only unresolved issues can be ${bulkOperationMode === 'Edit' ? 'edited' : 'moved'}.`} 
+            message={`Note: only unresolved issues can be bulk ${bulkOperationMode === 'Edit' ? 'edited' : 'moved'}.`} 
           />
         </div>
       );

@@ -294,7 +294,7 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
 
   const renderNoResults = () => {
     return renderPanelMessage(
-      `No work items found matching the search criteria.`, { margin: '20px 0px' }
+      `No allowed work items were found that match the search criteria.`, { margin: '20px 0px' }
     );
   }
 
