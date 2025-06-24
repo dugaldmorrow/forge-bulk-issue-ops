@@ -2,13 +2,13 @@
 
 import { Issue } from "../types/Issue";
 
-class BulkIssueTypeMapping {
+class bulkIssueTypeMappingModel {
 
-  // private listenerGroup = new ListenerGroup('BulkIssueTypeMapping');
+  // private listenerGroup = new ListenerGroup('bulkIssueTypeMappingModel');
   private sourceToTargetIssueTypeIds = new Map<string, string>();
 
   areAllIssueTypesMapped = (issues: Issue[]): boolean => {
-    // console.log(`BulkIssueTypeMapping: computing is all issue types are mapped based on selected issues = ${issues.map(issue => issue.key).join(', ')}`);
+    // console.log(`bulkIssueTypeMappingModel: computing is all issue types are mapped based on selected issues = ${issues.map(issue => issue.key).join(', ')}`);
     for (const issue of issues) {
       const targetIssueTypeId = this.getTargetIssueTypeId(issue.fields.project.id, issue.fields.issuetype.id);
       if (!targetIssueTypeId) {
@@ -19,7 +19,7 @@ class BulkIssueTypeMapping {
   }
 
   addMapping = (sourceProjectId: string, sourceIssueTypeId: string, targetIssueTypeId: string): void => {
-    console.log(`BulkIssueTypeMapping.addMapping: (${sourceProjectId}, ${sourceIssueTypeId}) -> ${targetIssueTypeId}`);
+    // console.log(`bulkIssueTypeMappingModelModel.addMapping: (${sourceProjectId}, ${sourceIssueTypeId}) -> ${targetIssueTypeId}`);
     const key = this.buildKey(sourceProjectId, sourceIssueTypeId);
     this.sourceToTargetIssueTypeIds.set(key, targetIssueTypeId);
     // this.notifyListeners();
@@ -59,4 +59,4 @@ class BulkIssueTypeMapping {
 
 }
 
-export default new BulkIssueTypeMapping();
+export default new bulkIssueTypeMappingModel();

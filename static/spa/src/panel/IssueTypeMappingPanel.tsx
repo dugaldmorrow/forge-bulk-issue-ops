@@ -51,7 +51,8 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
     bulkIssueTypeMappingModel.cloneSourceToTargetIssueTypeIds());
 
   const autoSelectMatchingTargetIssueTypes = (): void => {
-    // console.log('IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: Auto selecting matching target issue types for selected issues.');
+    // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: Auto selecting matching target issue types for ${props.selectedIssues.length} selected issues.`);
+    setAllRowData(buildAllRowData(props.selectedIssues));
     let newMappingsCount = 0;
     let unmappedCount = 0;
     for (const issue of props.selectedIssues) {
@@ -60,6 +61,7 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
       const existingTargetIssueTypeId = bulkIssueTypeMappingModel.getTargetIssueTypeId(sourceProject.id, sourceIssueType.id);
       if (existingTargetIssueTypeId) {
         // Do nothing - don't override existing mappings.
+        // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: Existing mapping found for source project: ${sourceProject.key}, source issue type: ${sourceIssueType.name} (${sourceIssueType.id}) - target issue type: ${existingTargetIssueTypeId}.`);
       } else {
         // Auto select the same issue type if possible where the source and target issue type names match.
         const matchingTargetIssueType = targetProjectIssueTypes.find(issueType => issueType.name === sourceIssueType.name);
@@ -247,7 +249,6 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
     );
   }
 
-  console.log(`IssueTypeMappingPanel.render: Rendering...`);
   return (
     <div style={{margin: '20px 0px'}}>
       {renderPanel()}

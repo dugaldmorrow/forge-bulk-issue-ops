@@ -386,7 +386,6 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
     );
   }
 
-  console.log(`FieldMappingPanel.render: Rendering...`);
   return (
     <div style={{margin: '20px 0px'}}>
       {props.fieldMappingsState.dataRetrieved ? renderFieldMappingsState() : null}
