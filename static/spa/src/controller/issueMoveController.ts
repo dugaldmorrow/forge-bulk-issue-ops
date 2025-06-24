@@ -7,6 +7,7 @@ import jiraDataModel from "../model/jiraDataModel";
 import { TargetMandatoryFields } from "../types/TargetMandatoryField";
 import { InvocationResult } from "../types/InvocationResult";
 import bulkIssueTypeMappingModel from "../model/bulkIssueTypeMappingModel";
+import { ObjectMapping } from "src/types/ObjectMapping";
 
 const issueMovePollPeriodMillis = 1000;
 
@@ -26,7 +27,15 @@ class IssueMoveController {
     }
 
     const allIssueTypes: IssueType[] = issueTypesInvocationResult.data;
-    const destinationProject = allProjectsSearchInfo.values.find(project => project.id === destinationProjectId);
+    let destinationProject = allProjectsSearchInfo.values.find(project => project.id === destinationProjectId);
+    if (!destinationProject) {
+      const destinationProjectInvocationResult = await jiraDataModel.getProjectByIdOrKey(destinationProjectId);
+      if (destinationProjectInvocationResult.ok) {
+        destinationProject = destinationProjectInvocationResult.data;
+      } else {
+        console.warn(` * Failed to find destination project with ID ${destinationProjectId}: ${destinationProjectInvocationResult.errorMessage}`);
+      }
+    }
     if (destinationProject) {
       const bulkIssueMoveRequestDataBuilder = new BulkIssueMoveRequestDataBuilder();
       const projectIssueTypeKeysToBuilders = new Map<string, ProjectIssueTypeClassificationBuilder>();
@@ -63,6 +72,7 @@ class IssueMoveController {
 
       // Step 2: Iterate over issue types so that all issues of the same type are dealt with together since this
       //         is how the bulk move API payload needs to be formatted.
+      const issueIdsToIssuesAddedToRequest: ObjectMapping<Issue> = {};
       const targetIssueTypes: IssueType[] = Array.from(sourceIssueTypeIdsToTargetIssueTypes.values());
       for (const targetIssueType of targetIssueTypes) {
         const issuesOfType = targetIssueTypeIdsToSourceIssues.get(targetIssueType.id);
@@ -76,7 +86,13 @@ class IssueMoveController {
             .setTargetClassification([])
             .setTargetMandatoryFields([]);
           for (const issueOfType of issuesOfType) {
-            projectIssueTypeClassificationBuilder.addIssueIdOrKey(issueOfType.id);
+            const issueAlreadyAdded = issueIdsToIssuesAddedToRequest[issueOfType.id];
+            if (issueAlreadyAdded) {
+              console.warn(` * Issue with ID ${issueOfType.id} already added to the request. Skipping.`);
+            } else {
+              projectIssueTypeClassificationBuilder.addIssueIdOrKey(issueOfType.id);
+              issueIdsToIssuesAddedToRequest[issueOfType.id] = issueOfType;
+            }
           }
           const targetMandatoryFields: TargetMandatoryFields = targetIssueTypeIdsToTargetMandatoryFields.get(
             targetIssueType.id);
@@ -96,6 +112,8 @@ class IssueMoveController {
           throw new Error(`Internal error: no issues found for issue type ${targetIssueType.id}`);
         }
       }
+      const issueIdsAdded = Object.keys(issueIdsToIssuesAddedToRequest);
+      console.log(` * Added ${issueIdsAdded.length} issues to the bulk move request: ${issueIdsAdded.join(', ')}`);
 
       // Step 3: Build the bulk issue move request data
       bulkIssueMoveRequestDataBuilder.setSendBulkNotification(sendBulkNotification);
@@ -111,6 +129,10 @@ class IssueMoveController {
         } else {
           console.warn(` * Initiation of bulk move request resulted in an error: ${requestOutcome.errors}`);
         }
+
+        // Step 5: Before returning, invalidate cached issue keys
+        await jiraDataModel.invalidateCachedIssueKeys();
+
         return requestOutcome;
       } else {
         console.warn(` * Initiation of bulk move request resulted in an API error: ${invocationResult.errorMessage}`);
@@ -125,6 +147,10 @@ class IssueMoveController {
         return requestOutcome;
       }
     } else {
+      console.log(`Dumping all projects search info: `);
+      for (const project of allProjectsSearchInfo.values) {
+        console.log(` * Project: ${project.id} = ${project.name} (${project.key})`);
+      }
       throw new Error(`Destination project ${destinationProjectId} not found`);
     }
   }

@@ -5,7 +5,7 @@
  */
 export const allowTheTargetProjectToMatchAnyIssueSourceProject = false;
 
-export const allowBulkMovesAcrossProjectCategories = false;
+export const allowBulkMovesAcrossProjectCategories = true;
 
 export const allowBulkMovesFromMultipleProjects = false;
 

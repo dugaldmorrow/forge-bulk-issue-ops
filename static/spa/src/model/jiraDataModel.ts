@@ -68,6 +68,10 @@ class JiraDataModel {
   // only makes sense for the entire set of results.
   private projectAndIssueTypeIdsToIssueBulkEditFields = new Map<string, IssueBulkEditField[]>();
 
+  public invalidateCachedIssueKeys = async (): Promise<void> => {
+    this.issueIdsOrKeysToEditIssueMetadata.clear();
+  }
+
   // TODO: Implement memoization
   public getIssueTypes = async (): Promise<InvocationResult<IssueType[]>> => {
     if (this.cachedIssueTypesInvocationResult.ok && this.cachedIssueTypesInvocationResult.data.length > 0) {
