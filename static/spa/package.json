@@ -24,6 +24,7 @@
     "@atlaskit/textfield": "^8.0.5",
     "@atlaskit/toggle": "^15.0.4",
     "@atlaskit/tokens": "^4.5.2",
+    "@atlaskit/tooltip": "^20.3.1",
     "@emotion/styled": "^11.14.0",
     "@forge/bridge": "^4.5.2",
     "@forge/jira-bridge": "^0.38.0",
