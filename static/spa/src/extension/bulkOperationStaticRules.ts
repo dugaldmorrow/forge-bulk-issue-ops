@@ -29,4 +29,5 @@ export const showLabelsSelect = false;
 
 export const showLabelsEditField = true;
 
+export const advancedFilterModeEnabled = false;
 export const filterModeDefault: 'advanced' | 'basic' = 'basic';

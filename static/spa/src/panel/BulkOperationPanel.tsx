@@ -23,7 +23,7 @@ import FieldMappingPanel, { FieldMappingsState, nilFieldMappingsState } from './
 import targetProjectFieldsModel from 'src/controller/TargetProjectFieldsModel';
 import { IssueSelectionPanel, IssueSelectionState, IssueSelectionValidity } from '../widget/IssueSelectionPanel';
 import bulkOperationRuleEnforcer from 'src/extension/bulkOperationRuleEnforcer';
-import { allowBulkEditsAcrossMultipleProjects, allowBulkEditsFromMultipleProjects, allowBulkMovesFromMultipleProjects, allowMoveIssuesWithSubtasks, enableTheAbilityToBulkChangeResolvedIssues, filterModeDefault, showLabelsSelect } from '../extension/bulkOperationStaticRules';
+import { allowBulkEditsAcrossMultipleProjects, allowBulkEditsFromMultipleProjects, allowBulkMovesFromMultipleProjects, allowMoveIssuesWithSubtasks, enableTheAbilityToBulkChangeResolvedIssues, advancedFilterModeEnabled, filterModeDefault, showLabelsSelect } from '../extension/bulkOperationStaticRules';
 import { BulkOperationMode } from 'src/types/BulkOperationMode';
 import IssueTypeMappingPanel from './IssueTypeMappingPanel';
 import { ObjectMapping } from 'src/types/ObjectMapping';
@@ -71,7 +71,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   const [bulkOperationMode, setBulkOperationMode] = useState<BulkOperationMode>(props.bulkOperationMode);
   const [mainWarningMessage, setMainWarningMessage] = useState<string>('');
   const [lastDataLoadTime, setLastDataLoadTime] = useState<number>(0);
-  const [filterMode, setFilterMode] = useState<FilterMode>(filterModeDefault);
+  const [filterMode, setFilterMode] = useState<FilterMode>(advancedFilterModeEnabled ? filterModeDefault : 'basic');
   const [enteredJql, setEnteredJql] = useState<string>('');
   const [allIssueTypes, setAllIssueTypes] = useState<IssueType[]>([]);
   const [issueLoadingState, setIssueLoadingState] = useState<LoadingState>('idle');
@@ -711,6 +711,9 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const renderFilterModeSelect = () => {
+    if (!advancedFilterModeEnabled) {
+      return null;
+    }
     return (
       <FormSection>
         <div className="filter-model-panel">
