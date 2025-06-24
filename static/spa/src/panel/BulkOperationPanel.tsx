@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Button from '@atlaskit/button/new';
 import LabelsSelect from '../widget/LabelsSelect';
 import { Project } from '../types/Project';
@@ -23,7 +23,7 @@ import FieldMappingPanel, { FieldMappingsState, nilFieldMappingsState } from './
 import targetProjectFieldsModel from 'src/controller/TargetProjectFieldsModel';
 import { IssueSelectionPanel, IssueSelectionState, IssueSelectionValidity } from '../widget/IssueSelectionPanel';
 import bulkOperationRuleEnforcer from 'src/extension/bulkOperationRuleEnforcer';
-import { allowBulkEditsAcrossMultipleProjects, allowBulkEditsFromMultipleProjects, allowBulkMovesFromMultipleProjects, enableTheAbilityToBulkChangeResolvedIssues, filterModeDefault, showLabelsSelect } from '../extension/bulkOperationStaticRules';
+import { allowBulkEditsAcrossMultipleProjects, allowBulkEditsFromMultipleProjects, allowBulkMovesFromMultipleProjects, allowMoveIssuesWithSubtasks, enableTheAbilityToBulkChangeResolvedIssues, filterModeDefault, showLabelsSelect } from '../extension/bulkOperationStaticRules';
 import { BulkOperationMode } from 'src/types/BulkOperationMode';
 import IssueTypeMappingPanel from './IssueTypeMappingPanel';
 import { ObjectMapping } from 'src/types/ObjectMapping';
@@ -88,13 +88,15 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [selectedLabelsTime, setSelectedLabelsTime] = useState<number>(0);
   const [allIssueTypesMapped, setAllIssueTypesMapped] = useState<boolean>(false);
-  const [fieldMappingsState, setFieldMappingsState] = useState<FieldMappingsState>(nilFieldMappingsState);
   const [allDefaultValuesProvided, setAllDefaultValuesProvided] = useState<boolean>(false);
   const [currentFieldMappingActivity, setCurrentFieldMappingActivity] = useState<undefined | Activity>(undefined);
   const [selectableIssueTypes, setSelectableIssueTypes] = useState<IssueType[]>([]);
   const [fieldIdsToValuesTime, setFieldIdsToValuesTime] = React.useState<number>(0);
   const [fieldMappingsComplete, setFieldMappingsComplete] = useState<boolean>(false);
   const [debugInfo, setDebugInfo] = useState<DebugInfo>({ projects: [], issueTypes: [] });
+
+  // Don't use the following to trigger rendering. i.e. child components shouldn't have a useEffect dependent on this.
+  const fieldMappingsState = useRef<FieldMappingsState>(nilFieldMappingsState);
 
   useEffect(() => {
     setBulkOperationMode(props.bulkOperationMode);
@@ -206,13 +208,13 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const clearFieldMappingsState = () => {
-    setFieldMappingsState(nilFieldMappingsState);
+    fieldMappingsState.current = nilFieldMappingsState;
     targetProjectFieldsModel.setProjectFieldMappings(nilFieldMappingsState.projectFieldMappings);
   }
 
   const isFieldMappingsComplete = () => {
     const allFieldValuesSet = targetProjectFieldsModel.areAllFieldValuesSet();
-    return fieldMappingsState.dataRetrieved && allFieldValuesSet;
+    return fieldMappingsState.current.dataRetrieved && allFieldValuesSet;
   }
 
   const retrieveAndSetDebugInfo = async (): Promise<void> => {
@@ -278,37 +280,43 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const computeSelectionValidity = (selectedIssues: Issue[]): IssueSelectionValidity => {
-      if (selectedIssues.length === 0) {
-        return "invalid-no-issues-selected";
-      }
-      const multipleProjectsDetected = jiraUtil.countProjectsByIssues(selectedIssues) > 1;
-      const multipleIssueTypesDetected = jiraUtil.countIssueTypesByIssues(selectedIssues) > 1;
-      if (props.bulkOperationMode === 'Move' && !allowBulkMovesFromMultipleProjects) {
-        // Don't allow moves from multiple projects
-        if (multipleProjectsDetected) {
-          return "multiple-projects";
-        }
-      }
-      if (props.bulkOperationMode === 'Move') {
-        // Don't allow multiple issue types to be selected when moving issues
-        if (multipleIssueTypesDetected) {
-          return "multiple-issue-types";
-        }
-      }
-      if (props.bulkOperationMode === 'Edit' && !allowBulkEditsFromMultipleProjects) {
-        // Don't allow edits from multiple projects
-        if (multipleProjectsDetected) {
-          return "multiple-projects";
-        }
-      }
-      if (props.bulkOperationMode === 'Edit') {
-        // Don't allow multiple issue types to be selected when editing issues
-        if (multipleIssueTypesDetected) {
-          return "multiple-issue-types";
-        }
-      }
-      return "valid";
+    if (selectedIssues.length === 0) {
+      return "invalid-no-issues-selected";
     }
+    const multipleProjectsDetected = jiraUtil.countProjectsByIssues(selectedIssues) > 1;
+    const multipleIssueTypesDetected = jiraUtil.countIssueTypesByIssues(selectedIssues) > 1;
+    if (props.bulkOperationMode === 'Move' && !allowBulkMovesFromMultipleProjects) {
+      // Don't allow moves from multiple projects
+      if (multipleProjectsDetected) {
+        return "multiple-projects";
+      }
+    }
+    if (props.bulkOperationMode === 'Move') {
+      // Don't allow multiple issue types to be selected when moving issues
+      if (multipleIssueTypesDetected) {
+        return "multiple-issue-types";
+      }
+    }
+    if (props.bulkOperationMode === 'Edit' && !allowBulkEditsFromMultipleProjects) {
+      // Don't allow edits from multiple projects
+      if (multipleProjectsDetected) {
+        return "multiple-projects";
+      }
+    }
+    if (props.bulkOperationMode === 'Edit') {
+      // Don't allow multiple issue types to be selected when editing issues
+      if (multipleIssueTypesDetected) {
+        return "multiple-issue-types";
+      }
+    }
+    if (!allowMoveIssuesWithSubtasks && props.bulkOperationMode === 'Move') {
+      const issuesWithSubtasks = jiraUtil.getIssuesWithSubtasks(selectedIssues);
+      if (issuesWithSubtasks.length > 0) {
+        return "invalid-subtasks-selected";
+      }
+    }
+    return "valid";
+  }
 
   const onIssuesLoaded = (allSelected: boolean, newIssueSearchInfo: IssueSearchInfo) => {
     const newlySelectedIssues = newIssueSearchInfo.issues;
@@ -340,8 +348,8 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     setIssueSelectionState(issueSelectionState);
     setSelectedIssuesTime(Date.now());
     targetProjectFieldsModel.setSelectedIssues(issueSelectionState.selectedIssues, allIssueTypes);
-    updateFieldMappingsIfNeeded(selectedToProject);
-    updateMappingsCompletionStates();
+    // Clear downstream state...
+    clearStepStateAfter('issue-selection');
     setStepCompletionState('issue-selection', issueSelectionState.selectionValidity === 'valid' ? 'complete' : 'incomplete');
   }
 
@@ -416,9 +424,55 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     await onAdvancedModeSearchIssues(jql);
   }
 
+  // This routine clears the state of the current step and downstream steps. However, the import 
+  // steps do not take advantage of this yet.
+  const clearStepState = (stepName: StepName) => {
+    console.log(`BulkOperationPanel.clearStepState: Clearing state for step "${stepName}"`);
+    let stateShouldBecomeIncomplete = true;
+    if (stepName === 'filter') {
+      // Do nothing
+    } else if (stepName === 'issue-selection') {
+      setIssueSelectionState({selectedIssues: [], selectionValidity: 'invalid-no-issues-selected'});
+      setSelectedIssuesTime(Date.now());
+    } else if (stepName === 'target-project-selection') {
+      setSelectedToProject(undefined);
+      setSelectedToProjectTime(Date.now());
+    } else if (stepName === 'issue-type-mapping') {
+      bulkIssueTypeMappingModel.clearMappings();
+      fieldMappingsState.current.projectFieldMappings.targetIssueTypeIdsToMappings.clear();
+    } else if (stepName === 'edit-fields') {
+      // No need to clear edited fields as this would be annoying for the user.
+      stateShouldBecomeIncomplete = false;
+    } else if (stepName === 'field-mapping') {
+      targetProjectFieldsModel.clearDefaultFieldValues();
+    } else if (stepName === 'move-or-edit') {
+      setIssueMoveOutcome(undefined);
+    } else if (stepName === 'file-upload') {
+      // This is yet to be implemented
+    } else if (stepName === 'column-mapping') {
+      // This is yet to be implemented
+    } else if (stepName === 'project-and-issue-type-selection') {
+      // This is yet to be implemented
+    } else if (stepName === 'import-issues') {
+      // This is yet to be implemented
+    } else {
+      console.warn(`BulkOperationPanel.clearStepState: No action defined for step "${stepName}".`);
+    }
+    if (stateShouldBecomeIncomplete) {
+      setStepCompletionState(stepName, 'incomplete');
+    }
+    clearStepStateAfter(stepName);
+  }
+
+  const clearStepStateAfter = (stepName: StepName) => {
+    const nextDownstreamStep = props.bulkOpsModel.getNextDownstreamStep(stepName);
+    if (nextDownstreamStep) {
+      clearStepState(nextDownstreamStep);
+    }
+  }
+
   const onFromProjectsSelect = async (selectedProjects: Project[]): Promise<void> => {
     // console.log(`BulkOperationPanel.onFromProjectsSelect: selectedProjects: ${JSON.stringify(selectedProjects, null, 2)}`);
-    setIssueMoveOutcome(undefined);
     setSelectedFromProjects(selectedProjects);
     setSelectedFromProjectsTime(Date.now());
     updateIssueTypeSelection([]);
@@ -433,6 +487,8 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       setSelectedToProjectTime(Date.now());
     }
     setStepCompletionState('filter', selectedProjects.length > 0 ? 'complete' : 'incomplete');
+    // Clear downstream state...
+    clearStepStateAfter('filter');
     await onBasicModeSearchIssues(selectedProjects, selectedIssueTypes, selectedLabels);
     // const selectableIssueTypes: IssueType[] = jiraUtil.filterProjectsIssueTypes(selectedFromProjects);
     const selectableIssueTypes: IssueType[] = jiraUtil.filterProjectsIssueTypes(selectedProjects);
@@ -456,9 +512,11 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
 
   const onToProjectSelect = async (selectedProject: undefined | Project): Promise<void> => {
     // console.log(`selectedToProject: `, selectedProject);
-    setIssueMoveOutcome(undefined);
     setSelectedToProject(selectedProject);
     setSelectedToProjectTime(Date.now());
+    // Clear downstream state...
+    clearStepStateAfter('target-project-selection');
+    // Automatically update field mappings if possible
     updateFieldMappingState(selectedProject);
   }
 
@@ -477,8 +535,9 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
 
   const onIssueTypesSelect = async (selectedIssueTypes: IssueType[]): Promise<void> => {
     // console.log(`selectedIssueTypes: `, selectedIssueTypes);
-    setIssueMoveOutcome(undefined);
     updateIssueTypeSelection(selectedIssueTypes);
+    // Clear downstream state...
+    clearStepStateAfter('filter');
     await onBasicModeSearchIssues(selectedFromProjects, selectedIssueTypes, selectedLabels);
   }
 
@@ -486,6 +545,8 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     // console.log(`BulkOperationPanel.onLabelsSelect: selectedLabels: `, selectedLabels);
     setSelectedLabels(selectedLabels);
     setSelectedLabelsTime(Date.now());
+    // Clear downstream state...
+    clearStepStateAfter('filter');
     await onBasicModeSearchIssues(selectedFromProjects, selectedIssueTypes, selectedLabels);
   }
 
@@ -522,9 +583,9 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const onInitiateFieldValueMapping = async (selectedToProject: Project): Promise<void> => {
-    const fieldMappingsState = await buildFieldMappingsState(selectedToProject);
-    setFieldMappingsState(fieldMappingsState);
-    targetProjectFieldsModel.setProjectFieldMappings(fieldMappingsState.projectFieldMappings);
+    const newFieldMappingsState = await buildFieldMappingsState(selectedToProject);
+    fieldMappingsState.current = newFieldMappingsState;
+    targetProjectFieldsModel.setProjectFieldMappings(newFieldMappingsState.projectFieldMappings);
   }
 
   const updateFieldMappingsIfNeeded = async (selectedToProject: undefined | Project): Promise<void> => {
@@ -532,7 +593,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       if (selectedToProject) {
         await onInitiateFieldValueMapping(selectedToProject);
       } else {
-        setFieldMappingsState(nilFieldMappingsState)
+        fieldMappingsState.current = nilFieldMappingsState;
       }
     }
   }
@@ -549,7 +610,12 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     const allIssueTypesMapped = bulkIssueTypeMappingModel.areAllIssueTypesMapped(issueSelectionState.selectedIssues);
     setAllIssueTypesMapped(allIssueTypesMapped);
     // setStepCompletionState('issue-type-mapping', allIssueTypesMapped ? 'complete' : 'incomplete');
-    setStepCompletionState('issue-type-mapping', issueSelectionState.selectedIssues.length > 0 && selectedIssueTypes.length > 0 && allIssueTypesMapped ? 'complete' : 'incomplete');
+
+    // const issueTypeMappingCompletionState = issueSelectionState.selectedIssues.length > 0 && selectedIssueTypes.length > 0 && allIssueTypesMapped ? 'complete' : 'incomplete';
+    // const issueTypeMappingCompletionState = issueSelectionState.selectedIssues.length > 0 && allIssueTypesMapped ? 'complete' : 'incomplete';
+    const issueTypeMappingCompletionState = issueSelectionState.selectionValidity === 'valid' && allIssueTypesMapped ? 'complete' : 'incomplete';
+
+    setStepCompletionState('issue-type-mapping', issueTypeMappingCompletionState);
     updateFieldMappingState(selectedToProject);
   }
 
@@ -850,7 +916,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     const buttonEnabled = selectedToProject && selectedToProject.id && issueSelectionState.selectedIssues.length > 0;
     return (
       <Button
-        appearance={fieldMappingsState.dataRetrieved ? 'default' : 'primary'}
+        appearance={fieldMappingsState.current.dataRetrieved ? 'default' : 'primary'}
         isDisabled={!buttonEnabled}
         onClick={() => {
           onInitiateFieldValueMapping(selectedToProject);
@@ -926,6 +992,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     const waitingMessage = new WaitingMessageBuilder()
       .addCheck(arePrerequisiteStepsComplete('field-mapping'), 'Waiting for previous steps to be completed.')
       .build();
+    const issueTypeMappingStepCompletionState = getStepCompletionState('issue-type-mapping');
     return (
       <div className="padding-panel">
         <div className="content-panel">
@@ -939,10 +1006,11 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
           {renderFieldMappingIndicator()}
           <FieldMappingPanel
             bulkOperationMode={bulkOperationMode}
+            issueTypeMappingStepCompletionState={issueTypeMappingStepCompletionState}
             allIssueTypes={allIssueTypes}
             issues={issueSelectionState.selectedIssues}
             targetProject={selectedToProject}
-            fieldMappingsState={fieldMappingsState}
+            fieldMappingsState={fieldMappingsState.current}
             showDebug={showDebug}
             onAllDefaultValuesProvided={onAllDefaultValuesProvided}
           />

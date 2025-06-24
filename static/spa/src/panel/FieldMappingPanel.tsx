@@ -21,6 +21,7 @@ import { formatIssueType } from 'src/controller/formatters';
 import { renderPanelMessage } from 'src/widget/PanelMessage';
 import { textToAdf } from 'src/controller/textToAdf';
 import { bulkMoveShowRetainOption } from 'src/model/config';
+import { CompletionState } from 'src/types/CompletionState';
 
 const showDebug = false;
 const showUnsupportedFields = false;
@@ -40,6 +41,7 @@ export const nilFieldMappingsState: FieldMappingsState = {
 
 export type FieldMappingPanelProps = {
   bulkOperationMode: BulkOperationMode;
+  issueTypeMappingStepCompletionState: CompletionState,
   allIssueTypes: IssueType[];
   issues: Issue[];
   fieldMappingsState: FieldMappingsState;
@@ -93,12 +95,10 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
     const targetIssueTypeIdsToTargetIssueTypes = determineTargetIssueTypeIdsToTargetIssueTypesBeingMapped(
       props.issues, props.allIssueTypes);
     setTargetIssueTypeIdsToTargetIssueTypesBeingMapped(targetIssueTypeIdsToTargetIssueTypes);
-
-
     // console.log(`FieldMappingPanel.refreshFromIssues: targetIssueTypeIdsToTargetIssueTypesBeingMapped = ${JSON.stringify(Array.from(targetIssueTypeIdsToTargetIssueTypes.entries()))}`);
     const allDefaultValuesProvided = targetProjectFieldsModel.areAllFieldValuesSet();
     if (allDefaultValuesProvided) {
-      console.log(`FieldMappingPanel.refreshFromIssues: All default values are provide, notifying parent.`);
+      // console.log(`FieldMappingPanel.refreshFromIssues: All default values are provided, notifying parent.`);
       // props.onAllDefaultValuesProvided(allDefaultValuesProvided);
       setTimeout(() => {
         // Send the notification to the parent after a short delay and different thread, otherwise it seems it leads to 
@@ -114,7 +114,7 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
 
   useEffect(() => {
     refreshFromIssues();
-  }, [props.issues, props.allIssueTypes, props.targetProject, props.fieldMappingsState]);
+  }, [props.issues, props.allIssueTypes, props.targetProject, props.issueTypeMappingStepCompletionState]);
 
   const onSelectDefaultFieldValue = (targetIssueType: IssueType, fieldId: string, fieldMetadata: FieldMetadata, defaultValue: DefaultFieldValue): void => {
     targetProjectFieldsModel.onSelectDefaultValue(targetIssueType, fieldId, fieldMetadata, defaultValue);

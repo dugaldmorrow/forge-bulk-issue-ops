@@ -19,6 +19,12 @@ export const allowBulkEditsAcrossMultipleProjects = true;
  */
 export const enableTheAbilityToBulkChangeResolvedIssues = false;
 
+/**
+ * If this is true, the bulk move and edit operations will allow moving issues with subtasks. It is
+ * set to false, though, because moving issues with subtasks often causes errors in Jira.
+ */
+export const allowMoveIssuesWithSubtasks = false;
+
 export const showLabelsSelect = false;
 
 export const showLabelsEditField = true;

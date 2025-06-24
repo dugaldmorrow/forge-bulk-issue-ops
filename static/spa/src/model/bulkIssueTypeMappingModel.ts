@@ -18,6 +18,12 @@ class bulkIssueTypeMappingModel {
     return true;
   }
 
+  clearMappings = (): void => {
+    // console.log('bulkIssueTypeMappingModelModel.clearMappings');
+    this.sourceToTargetIssueTypeIds.clear();
+    // this.notifyListeners();
+  }
+
   addMapping = (sourceProjectId: string, sourceIssueTypeId: string, targetIssueTypeId: string): void => {
     // console.log(`bulkIssueTypeMappingModelModel.addMapping: (${sourceProjectId}, ${sourceIssueTypeId}) -> ${targetIssueTypeId}`);
     const key = this.buildKey(sourceProjectId, sourceIssueTypeId);

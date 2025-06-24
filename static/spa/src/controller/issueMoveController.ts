@@ -17,13 +17,14 @@ class IssueMoveController {
     destinationProjectId: string,
     issues: Issue[],
     targetIssueTypeIdsToTargetMandatoryFields: Map<string, TargetMandatoryFields>,
+    moveSubtasks: boolean,
     sendBulkNotification: boolean,
   ): Promise<IssueMoveEditRequestOutcome> => {
     const allProjectsSearchInfo = await jiraDataModel.pageOfProjectSearchInfo('');
     const issueTypesInvocationResult: InvocationResult<IssueType[]> = await jiraDataModel.getIssueTypes();
     if (!issueTypesInvocationResult.ok) {
       await this.delay(2000);
-      return await this.initiateMove(destinationProjectId, issues, targetIssueTypeIdsToTargetMandatoryFields, sendBulkNotification);
+      return await this.initiateMove(destinationProjectId, issues, targetIssueTypeIdsToTargetMandatoryFields, moveSubtasks, sendBulkNotification);
     }
 
     const allIssueTypes: IssueType[] = issueTypesInvocationResult.data;
@@ -82,7 +83,7 @@ class IssueMoveController {
             .setInferClassificationDefaults(true)
             .setInferFieldDefaults(true)
             .setInferStatusDefaults(true)
-            .setInferSubtaskTypeDefault(true)
+            .setInferSubtaskTypeDefault(moveSubtasks)
             .setTargetClassification([])
             .setTargetMandatoryFields([]);
           for (const issueOfType of issuesOfType) {

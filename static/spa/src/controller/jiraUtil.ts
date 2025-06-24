@@ -35,6 +35,16 @@ class JiraUtil {
     return issueTypeIds.size;
   }
 
+  getIssuesWithSubtasks = (issues: Issue[]): Issue[] => {
+    const issuesWithSubtasks: Issue[] = [];
+    for (const issue of issues) {
+      if (issue.fields.subtasks && issue.fields.subtasks.length > 0) {
+        issuesWithSubtasks.push(issue);
+      }
+    }
+    return issuesWithSubtasks;
+  }
+
   countProjectsByIssues = (issues: Issue[]) => {
     const projectKeys = new Set<string>();
     for (const issue of issues) {

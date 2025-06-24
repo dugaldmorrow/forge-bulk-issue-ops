@@ -51,6 +51,11 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
     bulkIssueTypeMappingModel.cloneSourceToTargetIssueTypeIds());
 
   const autoSelectMatchingTargetIssueTypes = (): void => {
+    if (!props.targetProject) {
+      // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: skipping auto selection since target project is not defined.`);
+      return;
+    }
+
     // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: Auto selecting matching target issue types for ${props.selectedIssues.length} selected issues.`);
     setAllRowData(buildAllRowData(props.selectedIssues));
     let newMappingsCount = 0;
@@ -82,17 +87,15 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
     // console.log(`autoSelectMatchingTargetIssueTypes: clonedSourceToTargetIssueTypeIds = ${JSON.stringify(mapToObjectMap(clonedSourceToTargetIssueTypeIds), null, 2)}.`);
     // console.log(`autoSelectMatchingTargetIssueTypes: Finished auto selecting - unmappedCount = ${unmappedCount}.`);
     console.log(`autoSelectMatchingTargetIssueTypes: newMappingsCount = ${newMappingsCount}.`);
-    if (newMappingsCount > 0) {
-      // Notify the parent component only if the issue type mapping has changed. Otherwise it causes unnecessary renders and performance problems.
-      props.onIssueTypeMappingChange();
-    }
 
-    // setTimeout(props.onIssueTypeMappingChange, 1000);
+    // Since this occurs when there's a prop change, we only notify the parent after a delay to prevent the risk of a tight
+    // infinite loop of prop and rendering changes.
+    setTimeout(props.onIssueTypeMappingChange, 1000);
   }
 
   useEffect(() => {
     autoSelectMatchingTargetIssueTypes();
-  }, [targetProjectIssueTypes, props.selectedIssues]);
+  }, [props.targetProject, targetProjectIssueTypes, props.selectedIssues]);
 
   const getTargetIssueTypeId = (sourceProjectId: string, sourceIssueTypeId: string): string | undefined => {
     const key = buildKey(sourceProjectId, sourceIssueTypeId);
@@ -236,6 +239,7 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
       <div>
         <h3>Debug Information</h3>
         <p>Time = {new Date().toISOString()}</p>
+        <p>Target project = {props.targetProject ? props.targetProject.name : 'none'}</p>
         <p>Target project issue types:</p>
 
         <pre>

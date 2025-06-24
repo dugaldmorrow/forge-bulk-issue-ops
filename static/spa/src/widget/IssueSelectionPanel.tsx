@@ -16,7 +16,7 @@ import { PanelMessage, renderPanelMessage } from "./PanelMessage";
 import { BulkOperationMode } from "src/types/BulkOperationMode";
 import { maxIssueSearchResults } from "src/model/jiraDataModel";
 
-export type IssueSelectionValidity = "valid" | "invalid-no-issues-selected" | "multiple-projects" | "multiple-issue-types";
+export type IssueSelectionValidity = "valid" | "invalid-no-issues-selected" | "multiple-projects" | "multiple-issue-types" | "invalid-subtasks-selected";
 
 export type IssueSelectionState = {
   selectedIssues: Issue[];
@@ -209,6 +209,25 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
           className="warning-banner"
         />
       );
+    } else if (selectionValidity === 'invalid-subtasks-selected') {
+      const issuesWithSubtasks = jiraUtil.getIssuesWithSubtasks(props.issueSearchInfo.issues);
+      let message = '';
+      if (issuesWithSubtasks.length > 3) {
+        const firstThreeIssuesWithSubtasks = issuesWithSubtasks.slice(0, 3);
+        const issueKeysWithSubtasks = firstThreeIssuesWithSubtasks.map(issue => issue.key).join(', ');
+        message = `Issues ${issueKeysWithSubtasks} and ${issuesWithSubtasks.length - 3} more have subtasks, but this is not supported.`;
+      } else if (issuesWithSubtasks.length === 1) {
+        message = `${issuesWithSubtasks[0].key} has a subtask, but this is not supported.`;
+      } else {
+        const issueKeysWithSubtasks = issuesWithSubtasks.map(issue => issue.key).join(', ');
+        message = `Issues ${issueKeysWithSubtasks} have subtasks, but this is not supported.`;
+      }
+      return (
+        <PanelMessage
+          message={message}
+          className="warning-banner"
+        />
+      );
     } else {
       return null;
     }
@@ -268,10 +287,11 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
           />
         );
       } else {
+        const message = `Found ${props.issueSearchInfo.issues.length} work items (${props.selectedIssues.length} selected)`;
         renderedQuantityMessage = (
           <PanelMessage
             containerStyle={containerStyle}
-            message={`Found ${props.issueSearchInfo.issues.length} work items.`}
+            message={message}
           />
         );
       }

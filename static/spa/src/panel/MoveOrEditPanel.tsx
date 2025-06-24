@@ -25,6 +25,7 @@ import { formatProject } from 'src/controller/formatters';
 import issueEditController from 'src/controller/issueEditController';
 import { uuid } from 'src/model/util';
 import { IssueSelectionState } from 'src/widget/IssueSelectionPanel';
+import { allowMoveIssuesWithSubtasks } from 'src/extension/bulkOperationStaticRules';
 
 const showDebug = false;
 
@@ -41,6 +42,7 @@ export type MoveOrEditPanelProps = {
 
 export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
 
+  const [moveSubtasks, setMoveSubtasks] = useState<boolean>(false);
   const [sendBulkNotification, setSendBulkNotification] = useState<boolean>(false);
   const [currentMoveEditActivity, setCurrentMoveEditActivity] = useState<undefined | Activity>(undefined);
   const [issueMoveEditRequestOutcome, setIssueMoveEditRequestOutcome] = useState<undefined | IssueMoveEditRequestOutcome>(undefined);
@@ -139,6 +141,7 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
       destinationProjectId,
       props.issueSelectionState.selectedIssues,
       targetIssueTypeIdsToTargetMandatoryFields,
+      moveSubtasks,
       sendBulkNotification
     );
     setCurrentMoveEditActivity(undefined);
@@ -267,7 +270,7 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
     }
   }
 
-  const sendBulkNotificationToggle = () => {
+  const renderSendBulkNotificationToggle = () => {
     return (
       <div style={{display: 'flex', alignItems: 'center', marginBottom: '10px'}}>
         <Toggle
@@ -281,6 +284,25 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
           <Label htmlFor="send-bulk-notification-toggle">Send bulk notification</Label>
         </div>
       </div>
+    );
+  }
+
+  const renderMoveSubtasksToggleFormSection = () => {
+    return (
+      <FormSection>
+        <div style={{display: 'flex', alignItems: 'center', marginBottom: '10px'}}>
+          <Toggle
+            id={`move-subtasks-toggle`}
+            isChecked={moveSubtasks}
+            onChange={(event: any) => {
+              setMoveSubtasks(event.target.checked);
+            }}
+          />
+          <div>
+            <Label htmlFor="move-subtasks-toggle">Move subtasks</Label>
+          </div>
+        </div>
+      </FormSection>
     );
   }
 
@@ -392,9 +414,10 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
   }
 
   return (
-    <div >
+    <div>
+      {allowMoveIssuesWithSubtasks && props.bulkOperationMode === 'Move' ? renderMoveSubtasksToggleFormSection() : null}
       <FormSection>
-        {sendBulkNotificationToggle()}
+        {renderSendBulkNotificationToggle()}
       </FormSection>
       {renderEditSummary()}
       <FormSection>

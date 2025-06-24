@@ -20,6 +20,14 @@ class TargetProjectFieldsModel {
   private selectedTargetIssueTypeIdsToTypes = new Map<string, IssueType>();
   private selectedIssueTypes: IssueType[] = [];
 
+  clearDefaultFieldValues = (): void => {
+    this.targetIssueTypeIdsToFieldIdsToFieldSettings.forEach((fieldIdsToFieldSettings: Map<string, FieldSettings>, targetIssueTypeId: string) => {
+      fieldIdsToFieldSettings.forEach((fieldSettings: FieldSettings, fieldId: string) => {
+        fieldSettings.defaultFieldValue = undefined; // Clear the default field value
+      });
+    });
+  }
+
   getTargetIssueTypeIdsToFieldIdsToFieldSettings = (): Map<string, Map<string, FieldSettings>> => {
     return this.targetIssueTypeIdsToFieldIdsToFieldSettings;
   }

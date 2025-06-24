@@ -146,7 +146,7 @@ class JiraDataModel {
     // Note that the following limits the amount of fields to be returned for performance reasons, but
     // also could result in certain fields in the Issue type not being populated if these fields do 
     // not cover them all.
-    const fields = 'summary,description,issuetype,project';
+    const fields = 'summary,description,issuetype,project,subtasks';
     const expand = 'renderedFields';
     // console.log(` * jql=${jql}`);
     const paramsString = `jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&fields=${fields}&expand=${expand}`;
