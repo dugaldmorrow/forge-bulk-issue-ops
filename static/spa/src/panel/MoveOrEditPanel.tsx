@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FormSection, Label } from '@atlaskit/form';
 import Button from '@atlaskit/button/new';
 import Toggle from '@atlaskit/toggle';
@@ -47,6 +47,7 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
   const [issueMoveEditOutcome, setIssueMoveEditOutcome] = useState<undefined | TaskOutcome>(undefined);
   const [issueMoveEditCompletionTime, setIssueMoveEditCompletionTime] = useState<number>(0);
   const [lastMoveEditCompletionTaskId, setLastMoveEditCompletionTaskId] = useState<string>('none');
+  const countOfIssuesToMoveOrEdit = useRef<number>(0);
 
   const crossCheckIssueSelectionState = (): boolean => {
     const issueSelectionState = editedFieldsModel.getIssueSelectionState();
@@ -127,8 +128,9 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
     }
   }
 
-  const onMoveIssues = async (): Promise<void> => {
+  const onMoveIssues = async (issueSelectionState: IssueSelectionState): Promise<void> => {
     // Step 1: Initiate the bulk move request...
+    countOfIssuesToMoveOrEdit.current = issueSelectionState.selectedIssues.length;
     const destinationProjectId: string = props.selectedToProject.id;
     setIssueMoveEditRequestOutcome(undefined);
     setCurrentMoveEditActivity({taskId: 'non-jira-activity', description: 'Initiating bulk move request...'});
@@ -158,6 +160,7 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
 
   const onEditIssues = async (issueSelectionState: IssueSelectionState): Promise<void> => {
     // Step 1: Update the model with final inputs...
+    countOfIssuesToMoveOrEdit.current = issueSelectionState.selectedIssues.length;
     editedFieldsModel.setSendBulkNotification(sendBulkNotification);
 
     const crossCheckOk = crossCheckIssueSelectionState();
@@ -313,7 +316,7 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
           onClick={() => {
             setIssueMoveEditOutcome(undefined);
             if (props.bulkOperationMode === 'Move') {
-              onMoveIssues();
+              onMoveIssues(props.issueSelectionState);
             } else if (props.bulkOperationMode === 'Edit') {
               onEditIssues(props.issueSelectionState);
             }
@@ -365,7 +368,8 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
       const moveResult: IssueMoveEditOutcomeResult | undefined = issueMoveEditOutcome.result;
       const movedCount = moveResult ? moveResult.successfulIssues.length : -1;
       const failedCount = moveResult ? moveResult.totalIssueCount - movedCount : -1;
-      const renderedIssuesMovedResult = issueMoveEditOutcome.result ? <span># work items {props.bulkOperationMode === 'Move' ? 'moved' : 'edited'}: <Lozenge appearance="success">{movedCount}</Lozenge></span> : null;
+      const renderedMovedSuffix = movedCount > countOfIssuesToMoveOrEdit.current ? <span>{' '}(some work items had childrent that were also moved)</span> : null;
+      const renderedIssuesMovedResult = issueMoveEditOutcome.result ? <span># work items {props.bulkOperationMode === 'Move' ? 'moved' : 'edited'}: <><Lozenge appearance="success">{movedCount}</Lozenge>{renderedMovedSuffix}</></span> : null;
       const renderedIssuesNotMovedResult = issueMoveEditOutcome.result ? <span># work items not {props.bulkOperationMode === 'Move' ? 'moved' : 'edited'}: <Lozenge appearance="removed">{failedCount}</Lozenge></span> : null;
       const renderedOutcomeDebugJson = showDebug ? <pre>{JSON.stringify(issueMoveEditOutcome, null, 2)}</pre> : null;
       const progressPercent = issueMoveEditOutcome.progress ?? 0;
