@@ -34,6 +34,10 @@ import { ProjectComponent } from 'src/types/ProjectComponent';
 import { encode } from 'punycode';
 import { JiraLabel, LabelsQueryResponse } from 'src/types/JiraLabel';
 import { encodeAndQuoteLabel, filterProblematicLabels } from './labelsUtil';
+import { enableTheAbilityToBulkChangeResolvedIssues } from '../extension/bulkOperationStaticRules';
+
+// This is the maximum number of issues that can be returned by the search API.
+export const maxIssueSearchResults = 100;
 
 class JiraDataModel {
 
@@ -103,19 +107,38 @@ class JiraDataModel {
     if (issueSearchParameters.issueTypes.length) {
       const issueTypeIdsCsv = issueSearchParameters.issueTypes.map(issueType => issueType.id).join(',');
       jql += `${nextSeparator}issuetype in (${issueTypeIdsCsv})`;
+      nextSeparator = ' and ';
     }
 
     if (issueSearchParameters.labels.length) {
       // const labelsCsv = issueSearchParameters.labels.join(',');
       const labelsCsv = issueSearchParameters.labels.map(label => encodeAndQuoteLabel(label)).join(',');
       jql += `${nextSeparator}labels in (${labelsCsv})`;
+      nextSeparator = ' and ';
     }
+
+    if (enableTheAbilityToBulkChangeResolvedIssues) {
+      // Allow bulk changes for resolved issues
+      jql += `statusCategory != Done and ${jql}`;
+    }
+
     // console.log(` * built JQL: ${jql}`);
     return await this.getIssueSearchInfoByJql(jql);
   }
 
   public getIssueSearchInfoByJql = async (jql: string): Promise<IssueSearchInfo> => {
-    const maxResults = 100; // This is the maximum number supported by the API.
+    let alteredJql = jql;
+
+    if (enableTheAbilityToBulkChangeResolvedIssues) {
+      // Allow bulk changes for resolved issues
+      alteredJql += `statusCategory != Done and ${alteredJql}`;
+    }
+
+    return await this.getIssueSearchInfoByAlteredJql(alteredJql);
+  }
+
+  private getIssueSearchInfoByAlteredJql = async (jql: string): Promise<IssueSearchInfo> => {
+    const maxResults = maxIssueSearchResults;
     // Note that the following limits the amount of fields to be returned for performance reasons, but
     // also could result in certain fields in the Issue type not being populated if these fields do 
     // not cover them all.

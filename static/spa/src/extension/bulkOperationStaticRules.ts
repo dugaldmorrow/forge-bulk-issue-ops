@@ -13,6 +13,12 @@ export const allowBulkEditsFromMultipleProjects = false;
 
 export const allowBulkEditsAcrossMultipleProjects = true;
 
+/**
+ * If this is false, bulk moves and edits will not be allowed for issues that are already resolved. This
+ * effectively inserts `statusCategory != Done and ` before the JQL query used to find issues for bulk operations.
+ */
+export const enableTheAbilityToBulkChangeResolvedIssues = false;
+
 export const showLabelsSelect = false;
 
 export const showLabelsEditField = true;

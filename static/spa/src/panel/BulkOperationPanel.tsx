@@ -23,7 +23,7 @@ import FieldMappingPanel, { FieldMappingsState, nilFieldMappingsState } from './
 import targetProjectFieldsModel from 'src/controller/TargetProjectFieldsModel';
 import { IssueSelectionPanel, IssueSelectionState, IssueSelectionValidity } from '../widget/IssueSelectionPanel';
 import bulkOperationRuleEnforcer from 'src/extension/bulkOperationRuleEnforcer';
-import { allowBulkEditsAcrossMultipleProjects, allowBulkEditsFromMultipleProjects, allowBulkMovesFromMultipleProjects, filterModeDefault, showLabelsSelect } from '../extension/bulkOperationStaticRules';
+import { allowBulkEditsAcrossMultipleProjects, allowBulkEditsFromMultipleProjects, allowBulkMovesFromMultipleProjects, enableTheAbilityToBulkChangeResolvedIssues, filterModeDefault, showLabelsSelect } from '../extension/bulkOperationStaticRules';
 import { BulkOperationMode } from 'src/types/BulkOperationMode';
 import IssueTypeMappingPanel from './IssueTypeMappingPanel';
 import { ObjectMapping } from 'src/types/ObjectMapping';
@@ -757,6 +757,21 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     );
   }
 
+  const renderOnlyUnresolvedIssuesMessage = () => {
+    if (enableTheAbilityToBulkChangeResolvedIssues) {
+      return null;
+    } else {
+      return (
+        <div style={{marginBottom: '20px', marginTop: '20px'}}>
+          <PanelMessage
+            className="info-banner"
+            message={`Only unresolved issues can be ${bulkOperationMode === 'Edit' ? 'edited' : 'moved'}.`} 
+          />
+        </div>
+      );
+    }
+  }
+
   const renderFilterPanel = (stepNumber: number) => {
     return (
       <div className="padding-panel">
@@ -766,6 +781,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
             label={`Find work items to ${bulkOperationMode.toLowerCase()}`}
             completionState={getStepCompletionState('filter')}
           />
+          {renderOnlyUnresolvedIssuesMessage()}
           {renderFilterModeSelect()}
           {renderBasicFieldInputs()}
           {renderAdvancedFieldInputs()}
