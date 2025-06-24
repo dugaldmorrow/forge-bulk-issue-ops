@@ -368,7 +368,7 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
       const moveResult: IssueMoveEditOutcomeResult | undefined = issueMoveEditOutcome.result;
       const movedCount = moveResult ? moveResult.successfulIssues.length : -1;
       const failedCount = moveResult ? moveResult.totalIssueCount - movedCount : -1;
-      const renderedMovedSuffix = movedCount > countOfIssuesToMoveOrEdit.current ? <span>{' '}(some work items had childrent that were also moved)</span> : null;
+      const renderedMovedSuffix = movedCount > countOfIssuesToMoveOrEdit.current ? <span>{' '}(some work items had children that were also moved)</span> : null;
       const renderedIssuesMovedResult = issueMoveEditOutcome.result ? <span># work items {props.bulkOperationMode === 'Move' ? 'moved' : 'edited'}: <><Lozenge appearance="success">{movedCount}</Lozenge>{renderedMovedSuffix}</></span> : null;
       const renderedIssuesNotMovedResult = issueMoveEditOutcome.result ? <span># work items not {props.bulkOperationMode === 'Move' ? 'moved' : 'edited'}: <Lozenge appearance="removed">{failedCount}</Lozenge></span> : null;
       const renderedOutcomeDebugJson = showDebug ? <pre>{JSON.stringify(issueMoveEditOutcome, null, 2)}</pre> : null;
