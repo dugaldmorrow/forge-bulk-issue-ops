@@ -345,6 +345,28 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     setStepCompletionState('issue-selection', issueSelectionState.selectionValidity === 'valid' ? 'complete' : 'incomplete');
   }
 
+  const filterRetrieveIssues = async (issueSearchInfo: IssueSearchInfo) => {
+    const filteredIssues: Issue[] = [];
+    for (const issue of issueSearchInfo.issues) {
+      const issueType = issue.fields.issuetype;
+      if (issueType) {
+        const filteredIssueTypes = await bulkOperationRuleEnforcer.filterSourceProjectIssueTypes(
+          [issueType],
+          selectedFromProjects,
+          bulkOperationMode
+        );
+        if (filteredIssueTypes.length === 1) {
+          filteredIssues.push(issue);
+        } else {
+          console.log(`BulkOperationPanel: filterRetrieveIssues: Issue ${issue.key} has an unsupported issue type "${issueType.name}" for the selected source projects.`);
+        }
+      } else {
+        console.warn(`BulkOperationPanel: filterRetrieveIssues: Issue ${issue.key} has no issue type field, skipping.`);
+      }
+    }
+    issueSearchInfo.issues = filteredIssues;
+  }
+
   const onBasicModeSearchIssues = async (projects: Project[], issueTypes: IssueType[], labels: string[]): Promise<void> => {
     setIssueMoveOutcome(undefined);
     const noIssues = nilIssueSearchInfo();
@@ -357,6 +379,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
         labels: labels
       }
       const issueSearchInfo = await jiraDataModel.getIssueSearchInfo(issueSearchParameters) as IssueSearchInfo;
+      await filterRetrieveIssues(issueSearchInfo);
       if (issueSearchInfo.errorMessages && issueSearchInfo.errorMessages.length) {
         const joinedErrors = issueSearchInfo.errorMessages.join( );
         setMainWarningMessage(joinedErrors);
@@ -375,6 +398,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     setIssueLoadingState('busy');
     setTimeout(async () => {
       const issueSearchInfo = await jiraDataModel.getIssueSearchInfoByJql(jql) as IssueSearchInfo;
+      await filterRetrieveIssues(issueSearchInfo);
       const issueCount = issueSearchInfo.issues.length;
       onIssuesLoaded(issueCount > 0, issueSearchInfo);
       setStepCompletionState('filter', issueCount > 0 ? 'complete' : 'incomplete');

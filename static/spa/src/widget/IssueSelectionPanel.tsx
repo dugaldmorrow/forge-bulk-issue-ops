@@ -14,6 +14,7 @@ import { IssueLink } from "./IssueLink";
 import CrossCircleIcon from '@atlaskit/icon/core/cross-circle';
 import { PanelMessage, renderPanelMessage } from "./PanelMessage";
 import { BulkOperationMode } from "src/types/BulkOperationMode";
+import { maxIssueSearchResults } from "src/model/jiraDataModel";
 
 export type IssueSelectionValidity = "valid" | "invalid-no-issues-selected" | "multiple-projects" | "multiple-issue-types";
 
@@ -253,10 +254,17 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     if (props.issueSearchInfo.issues.length) {
       const containerStyle: any = {margin: '20px 0px'};
       if (!props.issueSearchInfo.isLast) {
+        let message = `Note: a maximum of ${maxIssueSearchResults} work items can be ${props.bulkOperationMode === 'Edit' ? 'edited' : 'moved'} at a time, but more works items match the search criteria.`;
+        if (props.issueSearchInfo.issues.length < maxIssueSearchResults) {
+          const filteredOutCount = maxIssueSearchResults - props.issueSearchInfo.issues.length;
+          message += ` ${filteredOutCount} work item${filteredOutCount > 1 ? 's were' : 'has been'} filtered out based on business rules.`
+        } else {
+
+        }
         renderedQuantityMessage = (
           <PanelMessage
-            containerStyle={containerStyle}
-            message={`Note: only ${props.issueSearchInfo.issues.length} work items can be ${props.bulkOperationMode === 'Edit' ? 'edited' : 'moved'} at a time, but more works items match the search criteria.`} 
+            className="info-banner"
+            message={message} 
           />
         );
       } else {
