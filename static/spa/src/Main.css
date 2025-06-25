@@ -45,9 +45,17 @@ span.button-link:hover {
   color: var(--ds-text-success);
 }
 
+div.banner-left-aligned-text {
+  text-align: left !important;
+}
+
+div.banner-full-width {
+  width: calc(100% - 12px) !important;
+}
+
 div.info-banner {
-  margin-top: 8px;
-  margin-bottom: 8px;
+  margin-top: 0px;
+  margin-bottom: 0px;
   margin-left: auto;
   margin-right: auto;
   width: 80%;

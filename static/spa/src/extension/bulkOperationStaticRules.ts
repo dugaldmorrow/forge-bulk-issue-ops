@@ -20,6 +20,13 @@ export const allowBulkEditsAcrossMultipleProjects = true;
 export const enableTheAbilityToBulkChangeResolvedIssues = false;
 
 /**
+ * This is a list of issue statuses that will be excluded from being selected for bulk operations. Change this 
+ * as necessary. For example, if statuses like "On-Hold" or "Cancelled" should not be included in bulk operations,
+ * set `excludedIssueStatuses` to `['On-Hold', 'Cancelled']`.
+ */
+export const excludedIssueStatuses: string[] = [];
+
+/**
  * If this is true, the bulk move and edit operations will allow moving issues with subtasks. It is
  * set to false, though, because moving issues with subtasks often causes errors in Jira.
  */
@@ -29,5 +36,5 @@ export const showLabelsSelect = false;
 
 export const showLabelsEditField = true;
 
-export const advancedFilterModeEnabled = false;
+export const advancedFilterModeEnabled = true;
 export const filterModeDefault: 'advanced' | 'basic' = 'basic';

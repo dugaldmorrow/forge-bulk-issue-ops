@@ -31,10 +31,11 @@ import { ObjectMapping } from 'src/types/ObjectMapping';
 import { ProjectCategory } from 'src/types/ProjectCategory';
 import { ProjectVersion } from 'src/types/ProjectVersion';
 import { ProjectComponent } from 'src/types/ProjectComponent';
-import { encode } from 'punycode';
-import { JiraLabel, LabelsQueryResponse } from 'src/types/JiraLabel';
+import { LabelsQueryResponse } from 'src/types/JiraLabel';
 import { encodeAndQuoteLabel, filterProblematicLabels } from './labelsUtil';
-import { enableTheAbilityToBulkChangeResolvedIssues } from '../extension/bulkOperationStaticRules';
+import { ParsedJqlQuery } from 'src/types/ParsedJqlQuery';
+import bulkOperationRuleEnforcer from 'src/extension/bulkOperationRuleEnforcer';
+import { BulkOperationMode } from 'src/types/BulkOperationMode';
 
 // This is the maximum number of issues that can be returned by the search API.
 export const maxIssueSearchResults = 100;
@@ -99,13 +100,16 @@ class JiraDataModel {
     return this.cachedFields;
   }
 
-  public getIssueSearchInfo = async (issueSearchParameters: IssueSearchParameters): Promise<IssueSearchInfo> => {
+  public convertIssueSearchParametersToJql = async (
+    issueSearchParameters: IssueSearchParameters,
+    bulkOperationMode: BulkOperationMode
+  ): Promise<string> => {
     // console.log(`getIssueSearchInfo: building JQL from ${JSON.stringify(issueSearchParameters, null, 2)}`);
     let jql = '';
     let nextSeparator = '';
     if (issueSearchParameters.projects.length) {
-      const projectIdsCsv = issueSearchParameters.projects.map(project => project.id).join(',');
-      jql += `${nextSeparator}project in (${projectIdsCsv})`;
+      const projectKeysCsv = issueSearchParameters.projects.map(project => project.key).join(',');
+      jql += `${nextSeparator}project in (${projectKeysCsv})`;
       nextSeparator = ' and ';
     }
     if (issueSearchParameters.issueTypes.length) {
@@ -115,30 +119,52 @@ class JiraDataModel {
     }
 
     if (issueSearchParameters.labels.length) {
-      // const labelsCsv = issueSearchParameters.labels.join(',');
       const labelsCsv = issueSearchParameters.labels.map(label => encodeAndQuoteLabel(label)).join(',');
       jql += `${nextSeparator}labels in (${labelsCsv})`;
       nextSeparator = ' and ';
     }
 
-    if (enableTheAbilityToBulkChangeResolvedIssues) {
-      // Allow bulk changes for resolved issues
-      jql += `statusCategory != Done and ${jql}`;
-    }
+    jql = await bulkOperationRuleEnforcer.augmentJqlWithBusinessRules(jql, bulkOperationMode);
 
     // console.log(` * built JQL: ${jql}`);
-    return await this.getIssueSearchInfoByJql(jql);
+    return jql
+  }
+
+  public parseJql = async (jql: string): Promise<InvocationResult<ParsedJqlQuery>> => {
+    // https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-jql/#api-rest-api-3-jql-parse-post
+    const bodyData = {
+      queries: [jql],
+    }
+    const response = await requestJira(`/rest/api/3/jql/parse?validation=warn`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(bodyData)
+    });
+    const multiplJqlsResult: InvocationResult<any> = await this.readResponse<any>(response);
+
+    const result: InvocationResult<ParsedJqlQuery> = {
+      ok: multiplJqlsResult.ok,
+      status: multiplJqlsResult.status,
+      errorMessage: multiplJqlsResult.errorMessage
+    };
+    if (multiplJqlsResult.data?.queries && multiplJqlsResult.data?.queries.length) {
+      const firstQuery = multiplJqlsResult.data.queries[0];
+      const parsedJqlQuery: ParsedJqlQuery = {
+        query: firstQuery.query,
+        structure: firstQuery.structure,
+        errors: firstQuery.errors,
+        warnings: firstQuery.warnings,
+      }
+      result.data = parsedJqlQuery;
+    }
+    return result;
   }
 
   public getIssueSearchInfoByJql = async (jql: string): Promise<IssueSearchInfo> => {
-    let alteredJql = jql;
-
-    if (enableTheAbilityToBulkChangeResolvedIssues) {
-      // Allow bulk changes for resolved issues
-      alteredJql += `statusCategory != Done and ${alteredJql}`;
-    }
-
-    return await this.getIssueSearchInfoByAlteredJql(alteredJql);
+    return await this.getIssueSearchInfoByAlteredJql(jql);
   }
 
   private getIssueSearchInfoByAlteredJql = async (jql: string): Promise<IssueSearchInfo> => {
