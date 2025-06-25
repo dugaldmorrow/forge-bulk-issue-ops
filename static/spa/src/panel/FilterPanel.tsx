@@ -18,7 +18,8 @@ import {
   enableTheAbilityToBulkChangeResolvedIssues,
   advancedFilterModeEnabled,
   filterModeDefault,
-  showLabelsSelect
+  showLabelsSelect,
+  excludedIssueStatuses
 } from '../extension/bulkOperationStaticRules';
 import { BulkOperationMode } from '../types/BulkOperationMode';
 import { PanelMessage } from '../widget/PanelMessage';
@@ -78,8 +79,10 @@ export const FilterPanel = (props: FilterPanelProps) => {
       removedIssues: []
     };
     for (const issue of issues) {
+      let includeIssue = true;
       const project = issue.fields.project;
       const issueType = issue.fields.issuetype;
+      const issueStatus = issue.fields.status;
       if (!project) {
         throw new Error(`Internal error: Issue ${issue.key} has no project field!`);
       }
@@ -93,11 +96,26 @@ export const FilterPanel = (props: FilterPanelProps) => {
         props.bulkOperationMode
       );
 
-      if (filteredProjects.length === 1 && filteredIssueTypes.length === 1 && filteredProjects[0].key === project.key && filteredIssueTypes[0].id === issueType.id) {
+      includeIssue = includeIssue && filteredProjects.length === 1 && filteredProjects[0].key === project.key;
+      includeIssue = includeIssue && filteredIssueTypes.length === 1 && filteredIssueTypes[0].id === issueType.id;
+      for (const statusToExclude of excludedIssueStatuses) {
+        if (!issueStatus) {
+          console.warn(`FilterPanel.filterRetrieveIssues: Issue ${issue.key} has no status field!`);
+          includeIssue = false;
+          break;
+        }
+        if (issueStatus.name === statusToExclude) {
+          console.log(`FilterPanel.filterRetrieveIssues: Issue ${issue.key} has status "${issueStatus.name}" which is excluded from bulk operations.`);
+          includeIssue = false;
+          break;
+        }
+      }
+
+      if (includeIssue) {
         issueFilterResults.allowedIssues.push(issue);
       } else {
         issueFilterResults.removedIssues.push(issue);
-        console.log(`FilterPanel: filterRetrieveIssues: Issue ${issue.key} has either an unsupported issue type "${issueType.name}" or an unsupported project "${project.key}" for the selected source projects.`);
+        // console.log(`FilterPanel: filterRetrieveIssues: Issue ${issue.key} has either an unsupported issue type "${issueType.name}" or an unsupported project "${project.key}" for the selected source projects.`);
       }
     }
     return issueFilterResults;
@@ -119,10 +137,10 @@ export const FilterPanel = (props: FilterPanelProps) => {
   const executeSearch = async (jql: string): Promise<void> => {
     await props.onIssueSearchInitiated();
     const issueSearchInfo = await jiraDataModel.getIssueSearchInfoByJql(jql) as IssueSearchInfo;
-    console.log(`FilterPanel.executeSearch: issueSearchInfo: ${JSON.stringify(issueSearchInfo, null, 2)}`);
+    // console.log(`FilterPanel.executeSearch: issueSearchInfo: ${JSON.stringify(issueSearchInfo, null, 2)}`);
     const issueFilterResults = await filterRetrieveIssues(issueSearchInfo.issues);
     setIssueFilterResults(issueFilterResults);
-    console.log(`FilterPanel.executeSearch: issueFilterResults: ${JSON.stringify(issueFilterResults, null, 2)}`);
+    // console.log(`FilterPanel.executeSearch: issueFilterResults: ${JSON.stringify(issueFilterResults, null, 2)}`);
     issueSearchInfo.issues = issueFilterResults.allowedIssues;
     await props.onIssueSearchCompleted(issueSearchInfo);
   }
@@ -133,7 +151,7 @@ export const FilterPanel = (props: FilterPanelProps) => {
     if (parsedJqlQueryInvocationResult.ok) {
       const parsedJqlQuery = parsedJqlQueryInvocationResult.data;
       setParsedJqlQuery(parsedJqlQuery);
-      console.log(`FilterPanel.onAdvancedModeSearchIssues: parsedJqlQuery: ${JSON.stringify(parsedJqlQuery, null, 2)}`);
+      // console.log(`FilterPanel.onAdvancedModeSearchIssues: parsedJqlQuery: ${JSON.stringify(parsedJqlQuery, null, 2)}`);
       if (parsedJqlQuery.errors && parsedJqlQuery.errors.length > 0) {
         // setErrorMessage(`JQL query parsing errors: ${parsedJqlQuery.errors.join(', ')}`);
       } else {
