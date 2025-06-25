@@ -60,7 +60,7 @@ class BulkOperationRuleEnforcer {
       nextSeparator = ' and ';
     }
 
-    if (!enableTheAbilityToBulkChangeResolvedIssues) {
+    if (criteriaToInsert) {
       // Filter out resolved issues
       const suffix = enhancedJql.trim().length > 0 ? ` and ${enhancedJql}` : '';
       enhancedJql = `${criteriaToInsert}${suffix}`;
