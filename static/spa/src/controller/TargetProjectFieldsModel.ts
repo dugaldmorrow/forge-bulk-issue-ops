@@ -5,6 +5,8 @@ import { TargetMandatoryFields, FieldValue } from "../types/TargetMandatoryField
 import { FieldMetadata } from "src/types/FieldMetadata";
 import { DefaultFieldValue } from "src/types/DefaultFieldValue";
 import bulkIssueTypeMappingModel from "src/model/bulkIssueTypeMappingModel";
+import { subtaskMoveStrategy } from "src/extension/bulkOperationStaticRules";
+import { expandIssueArrayToIncludeSubtasks } from "src/model/issueSelectionUtil";
 
 type FieldSettings = {
   defaultFieldValue?: DefaultFieldValue;
@@ -32,10 +34,12 @@ class TargetProjectFieldsModel {
     return this.targetIssueTypeIdsToFieldIdsToFieldSettings;
   }
 
-  setSelectedIssues = (issues: Issue[], allIssueTypes: IssueType[]): void => {
+  setSelectedIssues = async (issues: Issue[], allIssueTypes: IssueType[]): Promise<void> => {
     // console.log(`TargetProjectFieldsModel.setSelectedIssues: Setting selected issue types from selected issues (allIssueTypes.length = ${allIssueTypes.length})...`);
     this.selectedTargetIssueTypeIdsToTypes.clear();
-    issues.forEach(issue => {
+    const expandedIssues = subtaskMoveStrategy === 'move-subtasks-explicitly-with-parents' ?
+      await expandIssueArrayToIncludeSubtasks(issues) : issues;
+    expandedIssues.forEach(issue => {
       const sourceProjectId = issue.fields.project.id;
       const sourceIssueTypeId = issue.fields.issuetype.id;
       const targetIssueTypeId = bulkIssueTypeMappingModel.getTargetIssueTypeId(sourceProjectId, sourceIssueTypeId);

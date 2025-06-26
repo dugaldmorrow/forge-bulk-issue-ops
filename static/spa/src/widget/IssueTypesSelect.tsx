@@ -12,6 +12,7 @@ import { BulkOperationMode } from 'src/types/BulkOperationMode';
 
 export type IssueTypesSelectProps = {
   label: string;
+  placeholder?: string;
   selectedIssueTypes: IssueType[];
   possiblySelectableIssueTypes: IssueType[];
   menuPortalTarget?: HTMLElement;
@@ -45,7 +46,6 @@ const IssueTypesSelect = (props: IssueTypesSelectProps) => {
   const onChange = async (selectedOptions: Option[]): Promise<void> => {
     // console.log(`IssueTypesSelect.onChange: `, selectedOptions);
     const issueTypes: IssueType[] = selectableIssueTypes;
-    // const 
     const selectedIssueTypes: IssueType[] = [];
     for (const selectedOption of selectedOptions) {
       const issueType = issueTypes.find(issueType => issueType.id === selectedOption.value);
@@ -79,7 +79,7 @@ const IssueTypesSelect = (props: IssueTypesSelectProps) => {
         testId="issue-types-select"
         value={initiallySelectedOptions}
         options={options}
-        placeholder={props.label}
+        placeholder={props.placeholder ?? props.label}
         isClearable={props.isClearable}
         menuPortalTarget={props.menuPortalTarget}
         onChange={onChange}

@@ -11,8 +11,8 @@ import editedFieldsModel, { EditState } from 'src/model/editedFieldsModel';
 import { FieldEditValue } from 'src/types/FieldEditValue';
 import CrossCircleIcon from '@atlaskit/icon/core/cross-circle';
 import { OperationOutcome } from 'src/types/OperationOutcome';
-import { IssueSelectionState } from 'src/widget/IssueSelectionPanel';
 import { PanelMessage } from 'src/widget/PanelMessage';
+import { IssueSelectionState } from 'src/types/IssueSelectionState';
 
 const currentIssuesDebugEnabled = false;
 const editedFieldsDebugEnabled = false;
@@ -38,7 +38,8 @@ export const FieldEditsPanel = (props: FieldEditsPanelProps) => {
 
   const updateFieldsStateFromIssues = async (issueSelectionState: IssueSelectionState): Promise<void> => {
     // console.log(`FieldEditsPanel.updateFieldsStateFromIssues: Initialising state from issue selection state: validity: '${issueSelectionState.selectionValidity}', issues: ${JSON.stringify(issueSelectionState.selectedIssues.map(issue => issue.key))}...`);
-    setLoadingFields(true);
+    let loadingFields = true;
+    setLoadingFields(loadingFields);
     lastInvocationNumberRef.current = lastInvocationNumberRef.current + 1;
     const myInvocationNumber = lastInvocationNumberRef.current;
     try {
@@ -48,12 +49,16 @@ export const FieldEditsPanel = (props: FieldEditsPanelProps) => {
         // console.log(`FieldEditsPanel.updateFieldsStateFromIssues: Setting fields state from issues: ${JSON.stringify(issueSelectionState.selectedIssues.map(issue => issue.key))}`);
         const fields = editedFieldsModel.getFields();
         setFields(fields);
+        loadingFields = false;
       } else {
-        // This invocation is no longer the latest one, so we ignore it.
+        // This invocation is no longer the latest one, so we ignore it apart from making sure we keep indicating
+        // that we are still loading fields.
+        loadingFields = true;
         // console.log(`FieldEditsPanel.updateFieldsStateFromIssues: Ignoring stale invocation.`);
       }
     } finally {
-      setLoadingFields(false);
+      // console.log(`FieldEditsPanel.updateFieldsStateFromIssues: Finished loading fields = ${!loadingFields}.`);
+      setLoadingFields(loadingFields);
     }
   }
 

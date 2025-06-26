@@ -12,8 +12,10 @@ export class BulkIssueMoveRequestDataBuilder {
     targetToSourcesMapping: {}
   }
 
-  addMapping = (destinationProjectIdOrKey: string, destinationIssueTypeId: string, classification: ProjectIssueTypClassification): BulkIssueMoveRequestDataBuilder => {
-    const projectAndIssueTypeKey = `${destinationProjectIdOrKey},${destinationIssueTypeId}`;
+  addMapping = (destinationProjectIdOrKey: string, destinationIssueTypeId: string, destinationParentKeyOrId: string, classification: ProjectIssueTypClassification): BulkIssueMoveRequestDataBuilder => {
+    const projectAndIssueTypeKey = destinationParentKeyOrId ? 
+      `${destinationProjectIdOrKey},${destinationIssueTypeId},${destinationParentKeyOrId}` :
+      `${destinationProjectIdOrKey},${destinationIssueTypeId}`;
     this.bulkIssueMoveRequestData.targetToSourcesMapping[projectAndIssueTypeKey] = classification;
     return this;
   }

@@ -15,13 +15,9 @@ import CrossCircleIcon from '@atlaskit/icon/core/cross-circle';
 import { PanelMessage, renderPanelMessage } from "./PanelMessage";
 import { BulkOperationMode } from "src/types/BulkOperationMode";
 import { maxIssueSearchResults } from "src/model/jiraDataModel";
-
-export type IssueSelectionValidity = "valid" | "invalid-no-issues-selected" | "multiple-projects" | "multiple-issue-types" | "invalid-subtasks-selected";
-
-export type IssueSelectionState = {
-  selectedIssues: Issue[];
-  selectionValidity: IssueSelectionValidity;
-}
+import { IssueSelectionValidity } from "src/types/IssueSelectionValidity";
+import { IssueSelectionState } from "src/types/IssueSelectionState";
+import { newIssueSelectionUuid } from "src/model/issueSelectionUtil";
 
 export type IssueSelectionPanelProps = {
   loadingState: LoadingState;
@@ -44,7 +40,7 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     setStateValidity(selectionValidity);
   }, [props.issueSearchInfo.issues]);
 
-  const onToggleIssueSelection = (issueToToggle: Issue) => {
+  const onToggleIssueSelection = async (issueToToggle: Issue): Promise<void> => {
     const newSelectedIssues: Issue[] = [];
     for (const issue of props.issueSearchInfo.issues) {
       const existingSelectedIssueKey = props.selectedIssues.find((selectedIssue: Issue) => {
@@ -66,13 +62,14 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     const selectionValidity = props.computeSelectionValidity(newSelectedIssues);
     setStateValidity(selectionValidity);
     const issueSelectionState: IssueSelectionState = {
+      uuid: newIssueSelectionUuid(),
       selectedIssues: newSelectedIssues,
       selectionValidity: selectionValidity
     }
-    props.onIssuesSelectionChange(issueSelectionState);
+    await props.onIssuesSelectionChange(issueSelectionState);
   }
 
-  const onSelectAllIssues = () => {
+  const onSelectAllIssues = async (): Promise<void> => {
     const newSelectedIssues: Issue[] = [];
     let changeDetected = false;
     for (const issue of props.issueSearchInfo.issues) {
@@ -84,13 +81,14 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     const selectionValidity = props.computeSelectionValidity(newSelectedIssues);
     setStateValidity(selectionValidity);
     const issueSelectionState: IssueSelectionState = {
+      uuid: newIssueSelectionUuid(),
       selectedIssues: newSelectedIssues,
       selectionValidity: selectionValidity
     }
-    props.onIssuesSelectionChange(issueSelectionState);
+    await props.onIssuesSelectionChange(issueSelectionState);
   }
 
-  const onDeselectAllIssues = () => {
+  const onDeselectAllIssues = async (): Promise<void> => {
     let changeDetected = false;
     for (const issue of props.issueSearchInfo.issues) {
       const currentlySelected = props.selectedIssues.find(selectedIssue => selectedIssue.key === issue.key);
@@ -99,10 +97,11 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     const selectionValidity = props.computeSelectionValidity([]);
     setStateValidity(selectionValidity);
     const issueSelectionState: IssueSelectionState = {
+      uuid: newIssueSelectionUuid(),
       selectedIssues: [],
       selectionValidity: selectionValidity
     }
-    props.onIssuesSelectionChange(issueSelectionState);
+    await props.onIssuesSelectionChange(issueSelectionState);
   }
 
   const renderIssueLoading = () => {

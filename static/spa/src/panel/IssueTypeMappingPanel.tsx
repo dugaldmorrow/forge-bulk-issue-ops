@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Issue } from "../types/Issue";
 import { IssueType } from '../types/IssueType';
 import { Project } from 'src/types/Project';
@@ -8,6 +8,9 @@ import jiraDataModel from 'src/model/jiraDataModel';
 import bulkIssueTypeMappingModel from '../model/bulkIssueTypeMappingModel';
 import { formatIssueType, formatProject } from 'src/controller/formatters';
 import { BulkOperationMode } from 'src/types/BulkOperationMode';
+import { equalIssueSelections, expandIssueArrayToIncludeSubtasks, selectionToString } from 'src/model/issueSelectionUtil';
+import { IssueSelectionState } from 'src/types/IssueSelectionState';
+import { restrictIssueTypeMoveMappingsToSameHierarchyLevel, subtaskMoveStrategy } from 'src/extension/bulkOperationStaticRules';
 
 const showDebug = false;
 
@@ -17,19 +20,39 @@ type RowData = {
 }
 
 export type IssueTypeMappingPanelProps = {
-  selectedIssues: Issue[];
+  allIssueTypes: IssueType[],
+  issueSelectionState: IssueSelectionState,
   targetProject: undefined | Project;
   bulkOperationMode: BulkOperationMode;
   filterIssueTypes: (issueTypes: IssueType[], targetProject: Project, bulkOperationMode: BulkOperationMode) => IssueType[];
-  onIssueTypeMappingChange: () => Promise<void>;
+  onIssueTypeMappingChange: (issueSelectionState: IssueSelectionState, originalMappingCount: number, newMappingCount: number) => Promise<void>;
 }
 
 const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
 
-  const buildAllRowData = (issues: Issue[]): RowData[] => {
+  const [targetProjectIssueTypes, setTargetProjectIssueTypes] = useState<IssueType[]>([]);
+  const [allRowData, setAllRowData] = useState<RowData[]>([]);
+  const [clonedSourceToTargetIssueTypeIds, setClonedSourceToTargetIssueTypeIds] = useState<Map<string, string>>(
+    bulkIssueTypeMappingModel.cloneSourceToTargetIssueTypeIds());
+  const issueSelectionStateRef = useRef<IssueSelectionState>(props.issueSelectionState);
+
+  const onMount = async (): Promise<void> => {
+    setClonedSourceToTargetIssueTypeIds(bulkIssueTypeMappingModel.cloneSourceToTargetIssueTypeIds());
+    // bulkIssueTypeMapping.registerListener(onBulkIssueTypeMappingChange);
+    const rowData = await buildAllRowData(props.issueSelectionState.selectedIssues);
+    setAllRowData(rowData);
+  }
+
+  const onUnmount = (): void => {
+    // bulkIssueTypeMapping.unregisterListener(onBulkIssueTypeMappingChange);
+  }
+
+  const buildAllRowData = async (issues: Issue[]): Promise<RowData[]> => {
+    const expandedIssues = subtaskMoveStrategy === 'move-subtasks-explicitly-with-parents' ?
+      await expandIssueArrayToIncludeSubtasks(issues) : issues;
     const allRowData: RowData[] = [];
     const consumedProjectIssueTypePairs = new Set<string>();
-    for (const issue of issues) {
+    for (const issue of expandedIssues) {
       const project = issue.fields.project;
       const issueType = issue.fields.issuetype;
       const projectIssuTypePair = `${project.id},${issueType.id}`;
@@ -45,22 +68,20 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
     return allRowData;
   }
 
-  const [targetProjectIssueTypes, setTargetProjectIssueTypes] = useState<IssueType[]>([]);
-  const [allRowData, setAllRowData] = useState<RowData[]>(buildAllRowData(props.selectedIssues));
-  const [clonedSourceToTargetIssueTypeIds, setClonedSourceToTargetIssueTypeIds] = useState<Map<string, string>>(
-    bulkIssueTypeMappingModel.cloneSourceToTargetIssueTypeIds());
-
-  const autoSelectMatchingTargetIssueTypes = (): void => {
+  const autoSelectMatchingTargetIssueTypes = async (): Promise<void> => {
+    issueSelectionStateRef.current = props.issueSelectionState;
     if (!props.targetProject) {
       // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: skipping auto selection since target project is not defined.`);
       return;
     }
 
+    const originalMappingCount = bulkIssueTypeMappingModel.getMappingsCount();
     // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: Auto selecting matching target issue types for ${props.selectedIssues.length} selected issues.`);
-    setAllRowData(buildAllRowData(props.selectedIssues));
+    const rowData = await buildAllRowData(issueSelectionStateRef.current.selectedIssues);
+    setAllRowData(rowData);
     let newMappingsCount = 0;
     let unmappedCount = 0;
-    for (const issue of props.selectedIssues) {
+    for (const issue of issueSelectionStateRef.current.selectedIssues) {
       const sourceProject = issue.fields.project;
       const sourceIssueType = issue.fields.issuetype;
       const existingTargetIssueTypeId = bulkIssueTypeMappingModel.getTargetIssueTypeId(sourceProject.id, sourceIssueType.id);
@@ -80,22 +101,31 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
         }
       }
     }
-    // const mappedCount =  bulkIssueTypeMappingModel.getMappingsCount();
+    const newMappingCount =  bulkIssueTypeMappingModel.getMappingsCount();
     const clonedSourceToTargetIssueTypeIds = bulkIssueTypeMappingModel.cloneSourceToTargetIssueTypeIds();
     setClonedSourceToTargetIssueTypeIds(clonedSourceToTargetIssueTypeIds);
-    // console.log(`autoSelectMatchingTargetIssueTypes: clonedSourceToTargetIssueTypeIds = ${JSON.stringify(clonedSourceToTargetIssueTypeIds, null, 2)}.`);
-    // console.log(`autoSelectMatchingTargetIssueTypes: clonedSourceToTargetIssueTypeIds = ${JSON.stringify(mapToObjectMap(clonedSourceToTargetIssueTypeIds), null, 2)}.`);
     // console.log(`autoSelectMatchingTargetIssueTypes: Finished auto selecting - unmappedCount = ${unmappedCount}.`);
-    console.log(`autoSelectMatchingTargetIssueTypes: newMappingsCount = ${newMappingsCount}.`);
-
+    // console.log(`autoSelectMatchingTargetIssueTypes: newMappingsCount = ${newMappingsCount}.`);
+    const originalIssueSelectionState = Object.assign({}, issueSelectionStateRef.current);
     // Since this occurs when there's a prop change, we only notify the parent after a delay to prevent the risk of a tight
     // infinite loop of prop and rendering changes.
-    setTimeout(props.onIssueTypeMappingChange, 1000);
+    const notificationDelay = 1000;
+    // The following random delay was use to test for timing issues that could potentially result in the field mapping panel 
+    // remaining blank due to not getting the right notification.
+    // const notificationDelay = 30000 + Math.floor(Math.random() * 20000);
+    setTimeout(async () => {
+      if (equalIssueSelections(issueSelectionStateRef.current, originalIssueSelectionState)) {
+        // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: Calling onIssueTypeMappingChange with originalMappingCount=${originalMappingCount}, newMappingCount=${newMappingCount}`);
+        await props.onIssueTypeMappingChange(issueSelectionStateRef.current, originalMappingCount, newMappingCount);
+      } else {
+        // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: Skipping onIssueTypeMappingChange since the issueSelectionState has changed:\n * originalIssueSelectionState = ${selectionToString(originalIssueSelectionState)};\n * issueSelectionStateRef.current = ${selectionToString(issueSelectionStateRef.current)};`);
+      }
+    }, notificationDelay);
   }
 
   useEffect(() => {
     autoSelectMatchingTargetIssueTypes();
-  }, [props.targetProject, targetProjectIssueTypes, props.selectedIssues]);
+  }, [props.targetProject, targetProjectIssueTypes, props.issueSelectionState.uuid]);
 
   const getTargetIssueTypeId = (sourceProjectId: string, sourceIssueTypeId: string): string | undefined => {
     const key = buildKey(sourceProjectId, sourceIssueTypeId);
@@ -107,11 +137,13 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
   }
 
   const onTargetIssueTypeChange = (sourceProjectId: string, sourceIssueTypeId: string, targetIssueTypeId: string) => {
+    const originalMappingCount = bulkIssueTypeMappingModel.getMappingsCount();
     // console.log(`IssueTypeMappingPanel.onTargetIssueTypeChange: sourceProjectId=${sourceProjectId}, sourceIssueTypeId=${sourceIssueTypeId}, targetIssueTypeId=${targetIssueTypeId}`);
     bulkIssueTypeMappingModel.addMapping(sourceProjectId, sourceIssueTypeId, targetIssueTypeId);
     const clonedSourceToTargetIssueTypeIds = bulkIssueTypeMappingModel.cloneSourceToTargetIssueTypeIds();
     setClonedSourceToTargetIssueTypeIds(clonedSourceToTargetIssueTypeIds);
-    props.onIssueTypeMappingChange();
+    const newMappingCount =  bulkIssueTypeMappingModel.getMappingsCount();
+    props.onIssueTypeMappingChange(props.issueSelectionState, originalMappingCount, newMappingCount);
   }
 
   const determineInitiallySelectedOption = (
@@ -128,13 +160,18 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
 
   const renderTargetProjectIssueTypeSelect = (sourceProjectId: string, sourceIssueTypeId: string) => {
     const options: Option[] = [];
+    const sourceIssueType = props.allIssueTypes.find(issueType => issueType.id === sourceIssueTypeId);
     const filteredIssueTypes = props.filterIssueTypes(targetProjectIssueTypes, props.targetProject, props.bulkOperationMode);
-    for (const issueType of filteredIssueTypes.map(issueType => issueType)) {
-      const option: Option = {
-        label: `${formatIssueType(issueType)}`,
-        value: issueType.id,
-      };
-      options.push(option);
+    for (const issueType of filteredIssueTypes) {
+      const addOption = !restrictIssueTypeMoveMappingsToSameHierarchyLevel || (sourceIssueType && issueType.hierarchyLevel === sourceIssueType.hierarchyLevel);
+      if (addOption) {
+        // If the target issue type is a parent of the source issue type, select it by default
+        const option: Option = {
+          label: `${formatIssueType(issueType)}`,
+          value: issueType.id,
+        };
+        options.push(option);
+      }
     }
     const defaultValue = determineInitiallySelectedOption(sourceProjectId, sourceIssueTypeId, options);
     // console.log(`renderTargetProjectIssueTypeSelect: defaultValue for source project ${sourceProjectId}, source issue type ${sourceIssueTypeId} is "${defaultValue ? defaultValue.label : 'none'}" (${defaultValue ? defaultValue.value : 'none'})`);
@@ -181,10 +218,9 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
   // }
  
   useEffect(() => {
-    setClonedSourceToTargetIssueTypeIds(bulkIssueTypeMappingModel.cloneSourceToTargetIssueTypeIds());
-    // bulkIssueTypeMapping.registerListener(onBulkIssueTypeMappingChange);
+    onMount();
     return () => {
-      // bulkIssueTypeMapping.unregisterListener(onBulkIssueTypeMappingChange);
+      onUnmount();
     };
   }, []);
 
@@ -221,7 +257,7 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
   }
 
   const renderPanel = () => {
-    if (props.targetProject && props.selectedIssues.length > 0) {
+    if (props.targetProject && props.issueSelectionState.selectedIssues.length > 0) {
       return renderMappings();
     } else {
       return null;

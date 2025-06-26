@@ -17,15 +17,13 @@ import { TaskOutcome } from 'src/types/TaskOutcome';
 import { renderPanelMessage } from 'src/widget/PanelMessage';
 import targetProjectFieldsModel from '../controller/TargetProjectFieldsModel';
 import { Project } from 'src/types/Project';
-import { Issue } from 'src/types/Issue';
 import { IssueMoveEditOutcomeResult } from 'src/types/IssueMoveOutcomeResult';
 import Lozenge from '@atlaskit/lozenge';
 import { TaskStatusLozenge } from 'src/widget/TaskStatusLozenge';
 import { formatProject } from 'src/controller/formatters';
 import issueEditController from 'src/controller/issueEditController';
 import { uuid } from 'src/model/util';
-import { IssueSelectionState } from 'src/widget/IssueSelectionPanel';
-import { allowMoveIssuesWithSubtasks } from 'src/extension/bulkOperationStaticRules';
+import { IssueSelectionState } from '../types/IssueSelectionState';
 
 const showDebug = false;
 
@@ -42,7 +40,6 @@ export type MoveOrEditPanelProps = {
 
 export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
 
-  const [moveSubtasks, setMoveSubtasks] = useState<boolean>(false);
   const [sendBulkNotification, setSendBulkNotification] = useState<boolean>(false);
   const [currentMoveEditActivity, setCurrentMoveEditActivity] = useState<undefined | Activity>(undefined);
   const [issueMoveEditRequestOutcome, setIssueMoveEditRequestOutcome] = useState<undefined | IssueMoveEditRequestOutcome>(undefined);
@@ -89,32 +86,39 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
     }
   }
 
-  const pollPollMoveOrEditOutcome = async (taskId: string): Promise<void> => {
+  const onMoveOrEditCompletion = async (taskId: string, outcome: TaskOutcome): Promise<void> => {
+    setLastMoveEditCompletionTaskId(taskId);
+    const description = outcome.status === 'COMPLETE' ?
+      `Work items ${props.bulkOperationMode === 'Move' ? 'moved' : 'edited'} successfully.` :
+      `There were problems ${props.bulkOperationMode === 'Move' ? 'moving' : 'editing'} the work items.`;
+    // console.log(`BulkOperationPanel: pollPollMoveOutcome: Move completed with taskId ${taskId}`);
+    const flagOptions: FlagOptions = {
+      id: taskId,
+      type: outcome.status === 'COMPLETE' ? 'info' : 'error',
+      title: outcome.status === 'COMPLETE' ? `${props.bulkOperationMode} completed` : `${props.bulkOperationMode} ended with status ${outcome.status}`,
+      description: description,
+      isAutoDismiss: outcome.status === 'COMPLETE',
+      actions: outcome.status === 'COMPLETE' ? [] : [{
+        text: 'Got it',
+        onClick: async () => {
+          flag.close();
+        },
+      }]
+    }
+    const flag = showFlag(flagOptions);
+  }
+
+  const pollPollMoveOrEditOutcome = async (
+    taskId: string,
+    onCompletionCallback: (taskId: string, outcome: TaskOutcome) => Promise<void>
+  ): Promise<void> => {
     if (taskId) {
       const outcome: TaskOutcome = await issueMoveController.pollMoveProgress(taskId);
       setIssueMoveEditOutcome(outcome);
       if (issueMoveController.isDone(outcome.status)) {
         setIssueMoveEditCompletionTime(Date.now());
         if (taskId !== lastMoveEditCompletionTaskId) {
-          setLastMoveEditCompletionTaskId(taskId);
-          const description = outcome.status === 'COMPLETE' ?
-            `Work items ${props.bulkOperationMode === 'Move' ? 'moved' : 'edited'} successfully.` :
-            `There were problems ${props.bulkOperationMode === 'Move' ? 'moving' : 'editing'} the work items.`;
-          // console.log(`BulkOperationPanel: pollPollMoveOutcome: Move completed with taskId ${taskId}`);
-          const flagOptions: FlagOptions = {
-            id: taskId,
-            type: outcome.status === 'COMPLETE' ? 'info' : 'error',
-            title: outcome.status === 'COMPLETE' ? `${props.bulkOperationMode} completed` : `${props.bulkOperationMode} ended with status ${outcome.status}`,
-            description: description,
-            isAutoDismiss: outcome.status === 'COMPLETE',
-            actions: outcome.status === 'COMPLETE' ? [] : [{
-              text: 'Got it',
-              onClick: async () => {
-                flag.close();
-              },
-            }]
-          }
-          const flag = showFlag(flagOptions);
+          await onCompletionCallback(taskId, outcome);
         }
         setCurrentMoveEditActivity(undefined);
         props.onSetStepCompletionState('move-or-edit', 'complete');
@@ -131,6 +135,7 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
   }
 
   const onMoveIssues = async (issueSelectionState: IssueSelectionState): Promise<void> => {
+    console.log(`BulkOperationPanel: onMoveIssuesForLevel: Moving ${issueSelectionState.selectedIssues.length} issues. Issues being moved = ${issueSelectionState.selectedIssues.map(issue => issue.key).join(', ')}`);
     // Step 1: Initiate the bulk move request...
     countOfIssuesToMoveOrEdit.current = issueSelectionState.selectedIssues.length;
     const destinationProjectId: string = props.selectedToProject.id;
@@ -141,7 +146,6 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
       destinationProjectId,
       props.issueSelectionState.selectedIssues,
       targetIssueTypeIdsToTargetMandatoryFields,
-      moveSubtasks,
       sendBulkNotification
     );
     setCurrentMoveEditActivity(undefined);
@@ -156,8 +160,8 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
       showBulkOperationErrorFlag(fullErrorMessage);
     } else {
       // Step 2: Start polling for the outcome...
-      setCurrentMoveEditActivity({taskId: initiateOutcome.taskId, description: 'Polling for bulk move outcome...'});
-      pollPollMoveOrEditOutcome(initiateOutcome.taskId);
+      setCurrentMoveEditActivity({taskId: initiateOutcome.taskId, description: `Moving ${issueSelectionState.selectedIssues.length} selected work items...`});
+      pollPollMoveOrEditOutcome(initiateOutcome.taskId, onMoveOrEditCompletion);
     }
   }
 
@@ -190,14 +194,14 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
       showBulkOperationErrorFlag(fullErrorMessage);
     } else {
       // Step 3: Start polling for the outcome...
-      setCurrentMoveEditActivity({taskId: initiateOutcome.taskId, description: 'Polling for bulk move outcome...'});
-      pollPollMoveOrEditOutcome(initiateOutcome.taskId);
+      setCurrentMoveEditActivity({taskId: initiateOutcome.taskId, description: `Editing ${issueSelectionState.selectedIssues.length} work items...`});
+      pollPollMoveOrEditOutcome(initiateOutcome.taskId, onMoveOrEditCompletion);
     }
   }
 
   const asyncPollMoveOrEditOutcome = async (taskId: string): Promise<void> => {
     setTimeout(async () => {
-      await pollPollMoveOrEditOutcome(taskId);
+      await pollPollMoveOrEditOutcome(taskId, onMoveOrEditCompletion);
     }, taskStatusPollPeriodMillis);
   }
 
@@ -287,25 +291,6 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
     );
   }
 
-  const renderMoveSubtasksToggleFormSection = () => {
-    return (
-      <FormSection>
-        <div style={{display: 'flex', alignItems: 'center', marginBottom: '10px'}}>
-          <Toggle
-            id={`move-subtasks-toggle`}
-            isChecked={moveSubtasks}
-            onChange={(event: any) => {
-              setMoveSubtasks(event.target.checked);
-            }}
-          />
-          <div>
-            <Label htmlFor="move-subtasks-toggle">Move subtasks</Label>
-          </div>
-        </div>
-      </FormSection>
-    );
-  }
-
   const renderStartMoveOrEditButton = () => {
     let waitingMessage = '';
     if (props.bulkOperationMode === 'Move') {
@@ -332,7 +317,6 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
       <div>
         {renderPanelMessage(waitingMessage, {marginTop: '-6px', marginBottom: '20px'})}
         <Button
-          // key={`move-edit-button-${lastDataLoadTime}-${targetProjectFieldsModelUpdateTime}-${allDefaultValuesProvided}-${fieldIdsToValuesTime}`}
           appearance={buttonEnabled ? 'primary' : 'default'}
           isDisabled={!buttonEnabled}
           onClick={() => {
@@ -415,7 +399,6 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
 
   return (
     <div>
-      {allowMoveIssuesWithSubtasks && props.bulkOperationMode === 'Move' ? renderMoveSubtasksToggleFormSection() : null}
       <FormSection>
         {renderSendBulkNotificationToggle()}
       </FormSection>
