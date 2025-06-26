@@ -14,13 +14,10 @@ import { IssueLink } from "./IssueLink";
 import CrossCircleIcon from '@atlaskit/icon/core/cross-circle';
 import { PanelMessage, renderPanelMessage } from "./PanelMessage";
 import { BulkOperationMode } from "src/types/BulkOperationMode";
-
-export type IssueSelectionValidity = "valid" | "invalid-no-issues-selected" | "multiple-projects" | "multiple-issue-types";
-
-export type IssueSelectionState = {
-  selectedIssues: Issue[];
-  selectionValidity: IssueSelectionValidity;
-}
+import { maxIssueSearchResults } from "src/model/jiraDataModel";
+import { IssueSelectionValidity } from "src/types/IssueSelectionValidity";
+import { IssueSelectionState } from "src/types/IssueSelectionState";
+import { newIssueSelectionUuid } from "src/model/issueSelectionUtil";
 
 export type IssueSelectionPanelProps = {
   loadingState: LoadingState;
@@ -43,7 +40,7 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     setStateValidity(selectionValidity);
   }, [props.issueSearchInfo.issues]);
 
-  const onToggleIssueSelection = (issueToToggle: Issue) => {
+  const onToggleIssueSelection = async (issueToToggle: Issue): Promise<void> => {
     const newSelectedIssues: Issue[] = [];
     for (const issue of props.issueSearchInfo.issues) {
       const existingSelectedIssueKey = props.selectedIssues.find((selectedIssue: Issue) => {
@@ -65,13 +62,14 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     const selectionValidity = props.computeSelectionValidity(newSelectedIssues);
     setStateValidity(selectionValidity);
     const issueSelectionState: IssueSelectionState = {
+      uuid: newIssueSelectionUuid(),
       selectedIssues: newSelectedIssues,
       selectionValidity: selectionValidity
     }
-    props.onIssuesSelectionChange(issueSelectionState);
+    await props.onIssuesSelectionChange(issueSelectionState);
   }
 
-  const onSelectAllIssues = () => {
+  const onSelectAllIssues = async (): Promise<void> => {
     const newSelectedIssues: Issue[] = [];
     let changeDetected = false;
     for (const issue of props.issueSearchInfo.issues) {
@@ -83,13 +81,14 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     const selectionValidity = props.computeSelectionValidity(newSelectedIssues);
     setStateValidity(selectionValidity);
     const issueSelectionState: IssueSelectionState = {
+      uuid: newIssueSelectionUuid(),
       selectedIssues: newSelectedIssues,
       selectionValidity: selectionValidity
     }
-    props.onIssuesSelectionChange(issueSelectionState);
+    await props.onIssuesSelectionChange(issueSelectionState);
   }
 
-  const onDeselectAllIssues = () => {
+  const onDeselectAllIssues = async (): Promise<void> => {
     let changeDetected = false;
     for (const issue of props.issueSearchInfo.issues) {
       const currentlySelected = props.selectedIssues.find(selectedIssue => selectedIssue.key === issue.key);
@@ -98,10 +97,11 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     const selectionValidity = props.computeSelectionValidity([]);
     setStateValidity(selectionValidity);
     const issueSelectionState: IssueSelectionState = {
+      uuid: newIssueSelectionUuid(),
       selectedIssues: [],
       selectionValidity: selectionValidity
     }
-    props.onIssuesSelectionChange(issueSelectionState);
+    await props.onIssuesSelectionChange(issueSelectionState);
   }
 
   const renderIssueLoading = () => {
@@ -208,6 +208,25 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
           className="warning-banner"
         />
       );
+    } else if (selectionValidity === 'invalid-subtasks-selected') {
+      const issuesWithSubtasks = jiraUtil.getIssuesWithSubtasks(props.issueSearchInfo.issues);
+      let message = '';
+      if (issuesWithSubtasks.length > 3) {
+        const firstThreeIssuesWithSubtasks = issuesWithSubtasks.slice(0, 3);
+        const issueKeysWithSubtasks = firstThreeIssuesWithSubtasks.map(issue => issue.key).join(', ');
+        message = `Issues ${issueKeysWithSubtasks} and ${issuesWithSubtasks.length - 3} more have subtasks, but this is not supported.`;
+      } else if (issuesWithSubtasks.length === 1) {
+        message = `${issuesWithSubtasks[0].key} has a subtask, but this is not supported.`;
+      } else {
+        const issueKeysWithSubtasks = issuesWithSubtasks.map(issue => issue.key).join(', ');
+        message = `Issues ${issueKeysWithSubtasks} have subtasks, but this is not supported.`;
+      }
+      return (
+        <PanelMessage
+          message={message}
+          className="warning-banner"
+        />
+      );
     } else {
       return null;
     }
@@ -253,17 +272,25 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     if (props.issueSearchInfo.issues.length) {
       const containerStyle: any = {margin: '20px 0px'};
       if (!props.issueSearchInfo.isLast) {
+        let message = `Note: a maximum of ${maxIssueSearchResults} work items can be ${props.bulkOperationMode === 'Edit' ? 'edited' : 'moved'} at a time, but more works items match the search criteria.`;
+        if (props.issueSearchInfo.issues.length < maxIssueSearchResults) {
+          const filteredOutCount = maxIssueSearchResults - props.issueSearchInfo.issues.length;
+          message += ` ${filteredOutCount} work item${filteredOutCount > 1 ? 's were' : 'has been'} filtered out based on business rules.`
+        } else {
+
+        }
         renderedQuantityMessage = (
           <PanelMessage
-            containerStyle={containerStyle}
-            message={`Note: only ${props.issueSearchInfo.issues.length} work items can be ${props.bulkOperationMode === 'Edit' ? 'edited' : 'moved'} at a time, but more works items match the search criteria.`} 
+            className="info-banner"
+            message={message} 
           />
         );
       } else {
+        const message = `Found ${props.issueSearchInfo.issues.length} work items (${props.selectedIssues.length} selected)`;
         renderedQuantityMessage = (
           <PanelMessage
             containerStyle={containerStyle}
-            message={`Found ${props.issueSearchInfo.issues.length} work items.`}
+            message={message}
           />
         );
       }
@@ -286,7 +313,7 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
 
   const renderNoResults = () => {
     return renderPanelMessage(
-      `No work items found matching the search criteria.`, { margin: '20px 0px' }
+      `No allowed work items were found that match the search criteria.`, { margin: '20px 0px' }
     );
   }
 

@@ -1,5 +1,5 @@
 import { IssueBulkEditField } from "src/types/IssueBulkEditFieldApiResponse";
-import { allowBulkMovesAcrossProjectCategories, allowTheTargetProjectToMatchAnyIssueSourceProject } from "../extension/bulkOperationStaticRules";
+import { allowBulkMovesAcrossProjectCategories, allowTheTargetProjectToMatchAnyIssueSourceProject, enableTheAbilityToBulkChangeResolvedIssues, excludedIssueStatuses } from "../extension/bulkOperationStaticRules";
 import { Issue } from "../types/Issue";
 import { Project } from "../types/Project";
 import { OperationOutcome } from "src/types/OperationOutcome";
@@ -7,11 +7,9 @@ import { ObjectMapping } from "src/types/ObjectMapping";
 import { buildErrorOutcome, buildSuccessOutcome } from "../controller/OperationOutcomeBuilder";
 import { FieldEditValue } from "src/types/FieldEditValue";
 import { ProjectCategory } from "src/types/ProjectCategory";
-import jiraDataModel from "src/model/jiraDataModel";
-import jiraUtil from "src/controller/jiraUtil";
 import { IssueType } from "src/types/IssueType";
-import { filterEditFieldsImplementation } from "./filterEditFieldsImplementationTemplate";
 import { BulkOperationMode } from "src/types/BulkOperationMode";
+import { FilterMode } from "src/types/FilterMode";
 
 class BulkOperationRuleEnforcer {
 
@@ -19,6 +17,56 @@ class BulkOperationRuleEnforcer {
     // Just examples, you can add more project keys to exclude.
     .add('FIXED')
     .add('DUMMY');
+
+  /**
+   * This method is responsible for returning text that displays high level information explaining that the JQL
+   * entered by the user is automatically augmented with business rules.
+   * @param bulkOperationMode the current bulk operations mode, e.g. 'move' or 'edit'
+   * @returns A string containing the information. Return an empty string if there is no augmentation of JQL.
+   */
+  public buildJqlAugmentationLogicText = (
+    filterMode: FilterMode,
+    bulkOperationMode: BulkOperationMode
+  ) => {
+    if (filterMode === 'advanced') {
+      return `The entered JQL is automatically augmented to exclude resolved issues.`;
+    } else if (filterMode === 'basic') {
+      return `The selected criteria is automatically augmented to exclude resolved issues.`;
+    } else {
+      throw new Error(`Unknown filter mode: ${filterMode}. Expected 'advanced' or 'basic'.`);
+    }
+  }
+
+  /**
+   * This method is responsible for augmenting the JQL with business rules.
+   * @param jql The original JQL string.
+   * @param bulkOperationMode the current bulk operations mode, e.g. 'move' or 'edit'
+   * @returns The augmented JQL string.
+   */
+  public augmentJqlWithBusinessRules = async (
+    jql: string,
+    bulkOperationMode: BulkOperationMode
+  ): Promise<string> => {
+    let enhancedJql = jql;
+    let criteriaToInsert = '';
+    let nextSeparator = '';
+    if (!enableTheAbilityToBulkChangeResolvedIssues) {
+      criteriaToInsert = 'statusCategory != Done';
+      nextSeparator = ' and ';
+    }
+    if (excludedIssueStatuses && excludedIssueStatuses.length > 0) {
+      const quotedExcludedIssueStatuses = excludedIssueStatuses.map(status => `"${status}"`).join(',');
+      criteriaToInsert += `${nextSeparator}status not in (${quotedExcludedIssueStatuses})`;
+      nextSeparator = ' and ';
+    }
+
+    if (criteriaToInsert) {
+      // Filter out resolved issues
+      const suffix = enhancedJql.trim().length > 0 ? ` and ${enhancedJql}` : '';
+      enhancedJql = `${criteriaToInsert}${suffix}`;
+    }
+    return enhancedJql;
+  }
 
   /**
    * This function validates the value of a field against its validation rules.
@@ -53,6 +101,7 @@ class BulkOperationRuleEnforcer {
    * typing the name or key of the source project which results in a Jira API call to retrieve a set of matching
    * projects which is then passed to this function for filtering.
    * @param selectedSourceProjects 
+   * @param bulkOperationMode the current bulk operations mode, e.g. 'move' or 'edit'
    * @returns the filtered source projects that are allowed to be selected as the source project for the bulk move operation.
    */
   public filterSourceProjects = async (
@@ -88,6 +137,7 @@ class BulkOperationRuleEnforcer {
    * Filters the issue types that are allowed to be mapped to in the bulk move operation.
    * @param issueTypes The issue types to filter.
    * @param targetProject The target project for the bulk edit operation.
+   * @param bulkOperationMode the current bulk operations mode, e.g. 'move' or 'edit'
    * @returns The filtered issue types that are allowed to be selected as the target issue type.
    */
   public filterIssueTypes = (
@@ -101,7 +151,8 @@ class BulkOperationRuleEnforcer {
 
       // The following is a simple example to avoid changing parenting of issues by identifying 
       // issue types based on their names. It would be more robust to use the issue type IDs.
-      if (issueType.name === 'Epic' || issueType.name === 'Sub-task') {
+      // if (issueType.name === 'Epic' || issueType.name === 'Sub-task' || issueType.name === 'Bug') {
+      if (issueType.name === 'Epic' || issueType.name === 'Bug') {
         return false;
       }
 

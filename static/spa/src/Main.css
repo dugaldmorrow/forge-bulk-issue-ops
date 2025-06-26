@@ -45,6 +45,26 @@ span.button-link:hover {
   color: var(--ds-text-success);
 }
 
+div.banner-left-aligned-text {
+  text-align: left !important;
+}
+
+div.banner-full-width {
+  width: calc(100% - 12px) !important;
+}
+
+div.info-banner {
+  margin-top: 0px;
+  margin-bottom: 0px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 80%;
+  padding: 6px;
+  border-radius: 6px;
+  text-align: center;
+  background-color: var(--ds-background-discovery);
+}
+
 div.warning-banner {
   margin-top: 8px;
   margin-bottom: 8px;

@@ -20,6 +20,18 @@ export const debounce = (func: Function, wait: number, immediate: boolean) => {
   };
 };
 
+export const applyDebouncingDelay = (func: (...args: any[]) => Promise<any | undefined>, delay: number) => {
+  let timeoutId: NodeJS.Timeout | null = null;
+  return async (...args: any[]) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(async () => {
+      return await func(...args);
+    }, delay);
+  };
+}
+
 export const mapToObjectMap = <T>(map: Map<string, T>): ObjectMapping<T> => {
   const obj: ObjectMapping<T> = {};
   map.forEach((value, key) => {

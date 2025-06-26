@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Toggle from '@atlaskit/toggle';
 import { CustomFieldOption } from "../types/CustomFieldOption";
 import { IssueTypeFieldMappings, ProjectFieldMappings } from "../types/ProjectFieldMappings";
@@ -21,6 +21,9 @@ import { formatIssueType } from 'src/controller/formatters';
 import { renderPanelMessage } from 'src/widget/PanelMessage';
 import { textToAdf } from 'src/controller/textToAdf';
 import { bulkMoveShowRetainOption } from 'src/model/config';
+import { CompletionState } from 'src/types/CompletionState';
+import { subtaskMoveStrategy } from 'src/extension/bulkOperationStaticRules';
+import { expandIssueArrayToIncludeSubtasks } from 'src/model/issueSelectionUtil';
 
 const showDebug = false;
 const showUnsupportedFields = false;
@@ -40,24 +43,27 @@ export const nilFieldMappingsState: FieldMappingsState = {
 
 export type FieldMappingPanelProps = {
   bulkOperationMode: BulkOperationMode;
+  issueTypeMappingStepCompletionState: CompletionState,
   allIssueTypes: IssueType[];
   issues: Issue[];
   fieldMappingsState: FieldMappingsState;
   targetProject: Project;
   showDebug?: boolean;
-  onAllDefaultValuesProvided: (allDefaultsProvided: boolean) => void;
+  onAllDefaultValuesProvided: (allDefaultsProvided: boolean) => Promise<void>;
 }
 
 type FieldValueProviderRenderer = (fieldId: string, targetIssueType: IssueType, fieldMappingInfo: FieldMappingInfo) => JSX.Element;
 
 const FieldMappingPanel = (props: FieldMappingPanelProps) => {
 
-  const determineTargetIssueTypeIdsToTargetIssueTypesBeingMapped = (
+  const determineTargetIssueTypeIdsToTargetIssueTypesBeingMapped = async (
     issues: Issue[],
     allIssueTypes: IssueType[]
-  ): Map<string, IssueType> => {
+  ): Promise<Map<string, IssueType>> => {
     const targetIssueTypeIdsToTargetIssueTypes = new Map<string, IssueType>();
-    issues.forEach(issue => {
+    const expandedIssues = subtaskMoveStrategy === 'move-subtasks-explicitly-with-parents' ?
+      await expandIssueArrayToIncludeSubtasks(issues) : issues;
+    expandedIssues.forEach(issue => {
       const sourceProjectId = issue.fields.project.id;
       const sourceIssueTypeId = issue.fields.issuetype.id;
       const targetIssuetypeId = bulkIssueTypeMappingModel.getTargetIssueTypeId(sourceProjectId, sourceIssueTypeId);
@@ -73,9 +79,34 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
   }
 
   const [targetIssueTypeIdsToTargetIssueTypesBeingMapped, setTargetIssueTypeIdsToTargetIssueTypesBeingMapped] =
-    useState<Map<string, IssueType>>(determineTargetIssueTypeIdsToTargetIssueTypesBeingMapped(props.issues, props.allIssueTypes));
+    useState<Map<string, IssueType>>(new Map<string, IssueType>());
   const [fieldIdsToFields, setFieldIdsToFields] = useState< Map<string, Field>>(new Map<string, Field>());
   const [allDefaultsProvided, setAllDefaultsProvided] = useState<boolean>(false);
+  const lastNotfiedAllDefaultsProvidedValueRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    onMount();
+  }, []);
+
+  useEffect(() => {
+    refreshFromIssues();
+  }, [props.issues, props.allIssueTypes, props.targetProject, props.issueTypeMappingStepCompletionState]);
+
+  useEffect(() => {
+    loadFieldInfo();
+  }, [props.fieldMappingsState]);
+
+  const onMount = async (): Promise<void> => {
+    loadFieldInfo();
+    await refreshTargetIssueTypeIdsToTargetIssueTypesBeingMapped();
+  }
+
+  const refreshTargetIssueTypeIdsToTargetIssueTypesBeingMapped = async (): Promise<void> => {
+    const targetIssueTypeIdsToTargetIssueTypesBeingMapped = await determineTargetIssueTypeIdsToTargetIssueTypesBeingMapped(
+      props.issues, props.allIssueTypes);
+    setTargetIssueTypeIdsToTargetIssueTypesBeingMapped(targetIssueTypeIdsToTargetIssueTypesBeingMapped);
+    console.log(`FieldMappingPanel.refreshTargetIssueTypeIdsToTargetIssueTypesBeingMapped: targetIssueTypeIdsToTargetIssueTypesBeingMapped = ${JSON.stringify(Array.from(targetIssueTypeIdsToTargetIssueTypesBeingMapped.entries()), null, 2)}`);
+  }
 
   const loadFieldInfo = async (): Promise<void> => {
     const allFields = await jiraDataModel.getAllFields();
@@ -90,44 +121,39 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
   }
 
   const refreshFromIssues = async (): Promise<void> => {
-    const targetIssueTypeIdsToTargetIssueTypes = determineTargetIssueTypeIdsToTargetIssueTypesBeingMapped(
-      props.issues, props.allIssueTypes);
-    setTargetIssueTypeIdsToTargetIssueTypesBeingMapped(targetIssueTypeIdsToTargetIssueTypes);
-
-
-    // console.log(`FieldMappingPanel.refreshFromIssues: targetIssueTypeIdsToTargetIssueTypesBeingMapped = ${JSON.stringify(Array.from(targetIssueTypeIdsToTargetIssueTypes.entries()))}`);
+    await refreshTargetIssueTypeIdsToTargetIssueTypesBeingMapped();
     const allDefaultValuesProvided = targetProjectFieldsModel.areAllFieldValuesSet();
-    if (allDefaultValuesProvided) {
-      console.log(`FieldMappingPanel.refreshFromIssues: All default values are provide, notifying parent.`);
-      // props.onAllDefaultValuesProvided(allDefaultValuesProvided);
-      setTimeout(() => {
-        // Send the notification to the parent after a short delay and different thread, otherwise it seems it leads to 
-        // an infinite re-rendering loop.
-        props.onAllDefaultValuesProvided(allDefaultValuesProvided);
-      }, 1000);    
+    if (allDefaultValuesProvided !== lastNotfiedAllDefaultsProvidedValueRef.current) {
+      if (allDefaultValuesProvided) {
+        // console.log(`FieldMappingPanel.refreshFromIssues: All default values are provided, notifying parent.`);
+        setTimeout(async () => {
+          // Send the notification to the parent after a short delay and different thread, otherwise it seems it leads to 
+          // an infinite re-rendering loop.
+          lastNotfiedAllDefaultsProvidedValueRef.current = allDefaultValuesProvided;
+          await props.onAllDefaultValuesProvided(allDefaultValuesProvided);
+        }, 1000);    
+      }
     }
   }
 
-  useEffect(() => {
-    loadFieldInfo();
-  }, []);
-
-  useEffect(() => {
-    refreshFromIssues();
-  }, [props.issues, props.allIssueTypes, props.targetProject, props.fieldMappingsState]);
-
-  const onSelectDefaultFieldValue = (targetIssueType: IssueType, fieldId: string, fieldMetadata: FieldMetadata, defaultValue: DefaultFieldValue): void => {
+  const onSelectDefaultFieldValue = async (targetIssueType: IssueType, fieldId: string, fieldMetadata: FieldMetadata, defaultValue: DefaultFieldValue): Promise<void> => {
     targetProjectFieldsModel.onSelectDefaultValue(targetIssueType, fieldId, fieldMetadata, defaultValue);
     const allDefaultValuesProvided = targetProjectFieldsModel.areAllFieldValuesSet();
     setAllDefaultsProvided(allDefaultValuesProvided);
-    props.onAllDefaultValuesProvided(allDefaultValuesProvided);
+    if (allDefaultValuesProvided !== lastNotfiedAllDefaultsProvidedValueRef.current) {
+      lastNotfiedAllDefaultsProvidedValueRef.current = allDefaultValuesProvided;
+      await props.onAllDefaultValuesProvided(allDefaultValuesProvided);
+    }
   }
 
-  const onDeselectDefaultFieldValue = (targetIssueType: IssueType, fieldId: string, fieldMetadata: FieldMetadata): void => {
+  const onDeselectDefaultFieldValue = async (targetIssueType: IssueType, fieldId: string, fieldMetadata: FieldMetadata): Promise<void> => {
     targetProjectFieldsModel.onDeselectDefaultValue(targetIssueType, fieldId, fieldMetadata);
     const allDefaultValuesProvided = targetProjectFieldsModel.areAllFieldValuesSet();
     setAllDefaultsProvided(allDefaultValuesProvided);
-    props.onAllDefaultValuesProvided(allDefaultValuesProvided);
+    if (allDefaultValuesProvided !== lastNotfiedAllDefaultsProvidedValueRef.current) {
+      lastNotfiedAllDefaultsProvidedValueRef.current = allDefaultValuesProvided;
+      await props.onAllDefaultValuesProvided(allDefaultValuesProvided);
+    }
   }
 
   const onRetainFieldValueSelection = (targetIssueType: IssueType, fieldId: string, fieldMetadata: FieldMetadata, retainFieldValue: boolean): void => {
@@ -171,7 +197,6 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
         // console.log(`renderFieldValuesSelect: Skipping allowed value without a value: ${JSON.stringify(allowedValue)}`);
       }
     }
-    // const currentOption = targetProjectFieldsModel.getDefaultFieldValue(targetIssueType.id, fieldId);
     return (
       <FieldValuesSelect
         label={undefined}
@@ -184,7 +209,7 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
             type: "raw",
             value: [selectedCustomFieldOption.id]
           };
-          onSelectDefaultFieldValue(targetIssueType, fieldId, fieldMetadata, defaultValue);
+          await onSelectDefaultFieldValue(targetIssueType, fieldId, fieldMetadata, defaultValue);
         }}
       />
     );
@@ -200,7 +225,7 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
         name={fieldId}
         defaultValue={selectedDefaultFieldValue && selectedDefaultFieldValue.value.length > 0 ? selectedDefaultFieldValue.value[0] : ''}
         type="number"
-        onChange={(event) => {
+        onChange={async (event): Promise<void> => {
           let fieldValue: number | undefined = undefined;
           try {
             fieldValue = parseInt(event.currentTarget.value.trim());
@@ -209,7 +234,7 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
           }
           if (fieldValue === undefined || isNaN(fieldValue)) {
             console.warn(`Invalid number field value for field ID ${fieldId}:`, event.currentTarget.value);
-            onDeselectDefaultFieldValue(targetIssueType, fieldId, fieldMetadata);
+            await onDeselectDefaultFieldValue(targetIssueType, fieldId, fieldMetadata);
             return;
           } else {
             console.log(`Setting default value for field ID ${fieldId} to ${fieldValue}`);
@@ -218,7 +243,7 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
               type: "raw",
               value: [fieldValue]
             };
-            onSelectDefaultFieldValue(targetIssueType, fieldId, fieldMetadata, defaultValue);
+            await onSelectDefaultFieldValue(targetIssueType, fieldId, fieldMetadata, defaultValue);
           }
         }}
       />
@@ -232,9 +257,8 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
       <Textfield
         id={`string--for-${fieldId}`}
         name={fieldId}
-        // defaultValue={selectedDefaultFieldValue && selectedDefaultFieldValue.value.length > 0 ? selectedDefaultFieldValue.value[0] : ''}
         type="text"
-        onChange={(event) => {
+        onChange={async (event): Promise<void> => {
           const enteredText = event.currentTarget.value;
           // KNOWN-6: Rich text fields in bulk move operations only supports plain text where each new line is represented as a new paragraph.
           const adf = textToAdf(enteredText);
@@ -244,7 +268,7 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
             type: "adf",
             value: adf as any
           };
-          onSelectDefaultFieldValue(targetIssueType, fieldId, fieldMetadata, defaultValue);
+          await onSelectDefaultFieldValue(targetIssueType, fieldId, fieldMetadata, defaultValue);
         }}
       />
     );
@@ -386,7 +410,6 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
     );
   }
 
-  console.log(`FieldMappingPanel.render: Rendering...`);
   return (
     <div style={{margin: '20px 0px'}}>
       {props.fieldMappingsState.dataRetrieved ? renderFieldMappingsState() : null}

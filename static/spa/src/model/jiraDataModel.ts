@@ -31,9 +31,14 @@ import { ObjectMapping } from 'src/types/ObjectMapping';
 import { ProjectCategory } from 'src/types/ProjectCategory';
 import { ProjectVersion } from 'src/types/ProjectVersion';
 import { ProjectComponent } from 'src/types/ProjectComponent';
-import { encode } from 'punycode';
-import { JiraLabel, LabelsQueryResponse } from 'src/types/JiraLabel';
+import { LabelsQueryResponse } from 'src/types/JiraLabel';
 import { encodeAndQuoteLabel, filterProblematicLabels } from './labelsUtil';
+import { ParsedJqlQuery } from 'src/types/ParsedJqlQuery';
+import bulkOperationRuleEnforcer from 'src/extension/bulkOperationRuleEnforcer';
+import { BulkOperationMode } from 'src/types/BulkOperationMode';
+
+// This is the maximum number of issues that can be returned by the search API.
+export const maxIssueSearchResults = 100;
 
 class JiraDataModel {
 
@@ -48,6 +53,7 @@ class JiraDataModel {
   private cachedFields: Field[] = [];
   private fieldAndContextIdsToCustomFieldContextOptions = new Map<string, CustomFieldContextOption[]>();
   private projectIdsToProjectCreateIssueMetadata = new Map<string, ProjectCreateIssueMetadata>();
+  private cachedIssueIdsAndKeysToIssues: ObjectMapping<Issue> = {};
   private issueIdsOrKeysToEditIssueMetadata = new Map<string, EditIssueMetadata>();
   private labelPagesToLabels: ObjectMapping<string[]> = {};
 
@@ -63,6 +69,10 @@ class JiraDataModel {
   // This cache can not be changed to be on a per page basis since each page of results includes a cursor that
   // only makes sense for the entire set of results.
   private projectAndIssueTypeIdsToIssueBulkEditFields = new Map<string, IssueBulkEditField[]>();
+
+  public invalidateCachedIssueKeys = async (): Promise<void> => {
+    this.issueIdsOrKeysToEditIssueMetadata.clear();
+  }
 
   // TODO: Implement memoization
   public getIssueTypes = async (): Promise<InvocationResult<IssueType[]>> => {
@@ -91,35 +101,79 @@ class JiraDataModel {
     return this.cachedFields;
   }
 
-  public getIssueSearchInfo = async (issueSearchParameters: IssueSearchParameters): Promise<IssueSearchInfo> => {
+  public convertIssueSearchParametersToJql = async (
+    issueSearchParameters: IssueSearchParameters,
+    bulkOperationMode: BulkOperationMode
+  ): Promise<string> => {
     // console.log(`getIssueSearchInfo: building JQL from ${JSON.stringify(issueSearchParameters, null, 2)}`);
     let jql = '';
     let nextSeparator = '';
     if (issueSearchParameters.projects.length) {
-      const projectIdsCsv = issueSearchParameters.projects.map(project => project.id).join(',');
-      jql += `${nextSeparator}project in (${projectIdsCsv})`;
+      const projectKeysCsv = issueSearchParameters.projects.map(project => project.key).join(',');
+      jql += `${nextSeparator}project in (${projectKeysCsv})`;
       nextSeparator = ' and ';
     }
     if (issueSearchParameters.issueTypes.length) {
       const issueTypeIdsCsv = issueSearchParameters.issueTypes.map(issueType => issueType.id).join(',');
       jql += `${nextSeparator}issuetype in (${issueTypeIdsCsv})`;
+      nextSeparator = ' and ';
     }
 
     if (issueSearchParameters.labels.length) {
-      // const labelsCsv = issueSearchParameters.labels.join(',');
       const labelsCsv = issueSearchParameters.labels.map(label => encodeAndQuoteLabel(label)).join(',');
       jql += `${nextSeparator}labels in (${labelsCsv})`;
+      nextSeparator = ' and ';
     }
+
+    jql = await bulkOperationRuleEnforcer.augmentJqlWithBusinessRules(jql, bulkOperationMode);
+
     // console.log(` * built JQL: ${jql}`);
-    return await this.getIssueSearchInfoByJql(jql);
+    return jql
+  }
+
+  public parseJql = async (jql: string): Promise<InvocationResult<ParsedJqlQuery>> => {
+    // https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-jql/#api-rest-api-3-jql-parse-post
+    const bodyData = {
+      queries: [jql],
+    }
+    const response = await requestJira(`/rest/api/3/jql/parse?validation=warn`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(bodyData)
+    });
+    const multiplJqlsResult: InvocationResult<any> = await this.readResponse<any>(response);
+
+    const result: InvocationResult<ParsedJqlQuery> = {
+      ok: multiplJqlsResult.ok,
+      status: multiplJqlsResult.status,
+      errorMessage: multiplJqlsResult.errorMessage
+    };
+    if (multiplJqlsResult.data?.queries && multiplJqlsResult.data?.queries.length) {
+      const firstQuery = multiplJqlsResult.data.queries[0];
+      const parsedJqlQuery: ParsedJqlQuery = {
+        query: firstQuery.query,
+        structure: firstQuery.structure,
+        errors: firstQuery.errors,
+        warnings: firstQuery.warnings,
+      }
+      result.data = parsedJqlQuery;
+    }
+    return result;
   }
 
   public getIssueSearchInfoByJql = async (jql: string): Promise<IssueSearchInfo> => {
-    const maxResults = 100; // This is the maximum number supported by the API.
+    return await this.getIssueSearchInfoByAlteredJql(jql);
+  }
+
+  private getIssueSearchInfoByAlteredJql = async (jql: string): Promise<IssueSearchInfo> => {
+    const maxResults = maxIssueSearchResults;
     // Note that the following limits the amount of fields to be returned for performance reasons, but
     // also could result in certain fields in the Issue type not being populated if these fields do 
     // not cover them all.
-    const fields = 'summary,description,issuetype,project';
+    const fields = 'summary,description,issuetype,project,subtasks,status';
     const expand = 'renderedFields';
     // console.log(` * jql=${jql}`);
     const paramsString = `jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&fields=${fields}&expand=${expand}`;
@@ -134,6 +188,10 @@ class JiraDataModel {
     if (response.ok) {
       const issuesSearchInfo = await response.json();
       // console.log(`issuesSearchInfo: ${JSON.stringify(issuesSearchInfo, null, 2)}`);
+      issuesSearchInfo.issues.forEach((issue: Issue) => {
+        this.cachedIssueIdsAndKeysToIssues[issue.id] = issue;
+        this.cachedIssueIdsAndKeysToIssues[issue.key] = issue;
+      })
       return issuesSearchInfo;
     } else {
       const errorText = await response.text();
@@ -146,6 +204,31 @@ class JiraDataModel {
         issues: []
       };
       return issueSearchInfo;
+    }
+  }
+
+  getIssueByIdOrKey = async (issueIdOrKey: string): Promise<Issue> => {
+    const cachedIssue = this.cachedIssueIdsAndKeysToIssues[issueIdOrKey];
+    if (cachedIssue) {
+      // console.log(`JiraDataModel.getIssueByIdOrKey: Returning cached issue for ${issueIdOrKey}`);
+      return cachedIssue;
+    } else {
+      // console.log(`JiraDataModel.getIssueByIdOrKey: Fetching issue for ${issueIdOrKey}`);
+      const response = await requestJira(`/rest/api/3/issue/${issueIdOrKey}`, {
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      if (response.ok) {
+        const issue = await response.json() as Issue;
+        this.cachedIssueIdsAndKeysToIssues[issue.id] = issue;
+        this.cachedIssueIdsAndKeysToIssues[issue.key] = issue;
+        return issue;
+      } else {
+        const errorText = await response.text();
+        console.error(`Failed to fetch issue ${issueIdOrKey}: ${response.status}: ${errorText}`);
+        throw new Error(`Failed to fetch issue ${issueIdOrKey}: ${response.status}: ${errorText}`);
+      }
     }
   }
   

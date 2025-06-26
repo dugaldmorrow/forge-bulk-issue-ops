@@ -8,7 +8,9 @@ import { FieldEditValue } from "src/types/FieldEditValue";
 import { OperationOutcome } from "src/types/OperationOutcome";
 import jiraUtil from "src/controller/jiraUtil";
 import { IssueType } from "src/types/IssueType";
-import { IssueSelectionState } from "src/widget/IssueSelectionPanel";
+import { uuid } from "./util";
+import { IssueSelectionState } from "src/types/IssueSelectionState";
+import { newIssueSelectionUuid } from "./issueSelectionUtil";
 
 export type EditedFieldsModelIteratorCallback = (field: IssueBulkEditField, editedFieldValue: FieldEditValue) => void;
 
@@ -20,6 +22,7 @@ class EditedFieldsModel {
   private valueEditsListenerGroup = new ListenerGroup('EditedFieldsModel-value-edits');
   private sendBulkNotification: boolean = false;
   private issueSelectionState: IssueSelectionState = {
+    uuid: newIssueSelectionUuid(),
     selectedIssues: [],
     selectionValidity: 'invalid-no-issues-selected'
   };

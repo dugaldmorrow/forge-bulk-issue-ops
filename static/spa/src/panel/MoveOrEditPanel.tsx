@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FormSection, Label } from '@atlaskit/form';
 import Button from '@atlaskit/button/new';
 import Toggle from '@atlaskit/toggle';
@@ -17,14 +17,13 @@ import { TaskOutcome } from 'src/types/TaskOutcome';
 import { renderPanelMessage } from 'src/widget/PanelMessage';
 import targetProjectFieldsModel from '../controller/TargetProjectFieldsModel';
 import { Project } from 'src/types/Project';
-import { Issue } from 'src/types/Issue';
 import { IssueMoveEditOutcomeResult } from 'src/types/IssueMoveOutcomeResult';
 import Lozenge from '@atlaskit/lozenge';
 import { TaskStatusLozenge } from 'src/widget/TaskStatusLozenge';
 import { formatProject } from 'src/controller/formatters';
 import issueEditController from 'src/controller/issueEditController';
 import { uuid } from 'src/model/util';
-import { IssueSelectionState } from 'src/widget/IssueSelectionPanel';
+import { IssueSelectionState } from '../types/IssueSelectionState';
 
 const showDebug = false;
 
@@ -47,6 +46,7 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
   const [issueMoveEditOutcome, setIssueMoveEditOutcome] = useState<undefined | TaskOutcome>(undefined);
   const [issueMoveEditCompletionTime, setIssueMoveEditCompletionTime] = useState<number>(0);
   const [lastMoveEditCompletionTaskId, setLastMoveEditCompletionTaskId] = useState<string>('none');
+  const countOfIssuesToMoveOrEdit = useRef<number>(0);
 
   const crossCheckIssueSelectionState = (): boolean => {
     const issueSelectionState = editedFieldsModel.getIssueSelectionState();
@@ -86,32 +86,39 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
     }
   }
 
-  const pollPollMoveOrEditOutcome = async (taskId: string): Promise<void> => {
+  const onMoveOrEditCompletion = async (taskId: string, outcome: TaskOutcome): Promise<void> => {
+    setLastMoveEditCompletionTaskId(taskId);
+    const description = outcome.status === 'COMPLETE' ?
+      `Work items ${props.bulkOperationMode === 'Move' ? 'moved' : 'edited'} successfully.` :
+      `There were problems ${props.bulkOperationMode === 'Move' ? 'moving' : 'editing'} the work items.`;
+    // console.log(`BulkOperationPanel: pollPollMoveOutcome: Move completed with taskId ${taskId}`);
+    const flagOptions: FlagOptions = {
+      id: taskId,
+      type: outcome.status === 'COMPLETE' ? 'info' : 'error',
+      title: outcome.status === 'COMPLETE' ? `${props.bulkOperationMode} completed` : `${props.bulkOperationMode} ended with status ${outcome.status}`,
+      description: description,
+      isAutoDismiss: outcome.status === 'COMPLETE',
+      actions: outcome.status === 'COMPLETE' ? [] : [{
+        text: 'Got it',
+        onClick: async () => {
+          flag.close();
+        },
+      }]
+    }
+    const flag = showFlag(flagOptions);
+  }
+
+  const pollPollMoveOrEditOutcome = async (
+    taskId: string,
+    onCompletionCallback: (taskId: string, outcome: TaskOutcome) => Promise<void>
+  ): Promise<void> => {
     if (taskId) {
       const outcome: TaskOutcome = await issueMoveController.pollMoveProgress(taskId);
       setIssueMoveEditOutcome(outcome);
       if (issueMoveController.isDone(outcome.status)) {
         setIssueMoveEditCompletionTime(Date.now());
         if (taskId !== lastMoveEditCompletionTaskId) {
-          setLastMoveEditCompletionTaskId(taskId);
-          const description = outcome.status === 'COMPLETE' ?
-            `Work items ${props.bulkOperationMode === 'Move' ? 'moved' : 'edited'} successfully.` :
-            `There were problems ${props.bulkOperationMode === 'Move' ? 'moving' : 'editing'} the work items.`;
-          // console.log(`BulkOperationPanel: pollPollMoveOutcome: Move completed with taskId ${taskId}`);
-          const flagOptions: FlagOptions = {
-            id: taskId,
-            type: outcome.status === 'COMPLETE' ? 'info' : 'error',
-            title: outcome.status === 'COMPLETE' ? `${props.bulkOperationMode} completed` : `${props.bulkOperationMode} ended with status ${outcome.status}`,
-            description: description,
-            isAutoDismiss: outcome.status === 'COMPLETE',
-            actions: outcome.status === 'COMPLETE' ? [] : [{
-              text: 'Got it',
-              onClick: async () => {
-                flag.close();
-              },
-            }]
-          }
-          const flag = showFlag(flagOptions);
+          await onCompletionCallback(taskId, outcome);
         }
         setCurrentMoveEditActivity(undefined);
         props.onSetStepCompletionState('move-or-edit', 'complete');
@@ -127,8 +134,10 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
     }
   }
 
-  const onMoveIssues = async (): Promise<void> => {
+  const onMoveIssues = async (issueSelectionState: IssueSelectionState): Promise<void> => {
+    console.log(`BulkOperationPanel: onMoveIssuesForLevel: Moving ${issueSelectionState.selectedIssues.length} issues. Issues being moved = ${issueSelectionState.selectedIssues.map(issue => issue.key).join(', ')}`);
     // Step 1: Initiate the bulk move request...
+    countOfIssuesToMoveOrEdit.current = issueSelectionState.selectedIssues.length;
     const destinationProjectId: string = props.selectedToProject.id;
     setIssueMoveEditRequestOutcome(undefined);
     setCurrentMoveEditActivity({taskId: 'non-jira-activity', description: 'Initiating bulk move request...'});
@@ -151,13 +160,14 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
       showBulkOperationErrorFlag(fullErrorMessage);
     } else {
       // Step 2: Start polling for the outcome...
-      setCurrentMoveEditActivity({taskId: initiateOutcome.taskId, description: 'Polling for bulk move outcome...'});
-      pollPollMoveOrEditOutcome(initiateOutcome.taskId);
+      setCurrentMoveEditActivity({taskId: initiateOutcome.taskId, description: `Moving ${issueSelectionState.selectedIssues.length} selected work items...`});
+      pollPollMoveOrEditOutcome(initiateOutcome.taskId, onMoveOrEditCompletion);
     }
   }
 
   const onEditIssues = async (issueSelectionState: IssueSelectionState): Promise<void> => {
     // Step 1: Update the model with final inputs...
+    countOfIssuesToMoveOrEdit.current = issueSelectionState.selectedIssues.length;
     editedFieldsModel.setSendBulkNotification(sendBulkNotification);
 
     const crossCheckOk = crossCheckIssueSelectionState();
@@ -184,14 +194,14 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
       showBulkOperationErrorFlag(fullErrorMessage);
     } else {
       // Step 3: Start polling for the outcome...
-      setCurrentMoveEditActivity({taskId: initiateOutcome.taskId, description: 'Polling for bulk move outcome...'});
-      pollPollMoveOrEditOutcome(initiateOutcome.taskId);
+      setCurrentMoveEditActivity({taskId: initiateOutcome.taskId, description: `Editing ${issueSelectionState.selectedIssues.length} work items...`});
+      pollPollMoveOrEditOutcome(initiateOutcome.taskId, onMoveOrEditCompletion);
     }
   }
 
   const asyncPollMoveOrEditOutcome = async (taskId: string): Promise<void> => {
     setTimeout(async () => {
-      await pollPollMoveOrEditOutcome(taskId);
+      await pollPollMoveOrEditOutcome(taskId, onMoveOrEditCompletion);
     }, taskStatusPollPeriodMillis);
   }
 
@@ -264,7 +274,7 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
     }
   }
 
-  const sendBulkNotificationToggle = () => {
+  const renderSendBulkNotificationToggle = () => {
     return (
       <div style={{display: 'flex', alignItems: 'center', marginBottom: '10px'}}>
         <Toggle
@@ -307,13 +317,12 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
       <div>
         {renderPanelMessage(waitingMessage, {marginTop: '-6px', marginBottom: '20px'})}
         <Button
-          // key={`move-edit-button-${lastDataLoadTime}-${targetProjectFieldsModelUpdateTime}-${allDefaultValuesProvided}-${fieldIdsToValuesTime}`}
           appearance={buttonEnabled ? 'primary' : 'default'}
           isDisabled={!buttonEnabled}
           onClick={() => {
             setIssueMoveEditOutcome(undefined);
             if (props.bulkOperationMode === 'Move') {
-              onMoveIssues();
+              onMoveIssues(props.issueSelectionState);
             } else if (props.bulkOperationMode === 'Edit') {
               onEditIssues(props.issueSelectionState);
             }
@@ -365,7 +374,8 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
       const moveResult: IssueMoveEditOutcomeResult | undefined = issueMoveEditOutcome.result;
       const movedCount = moveResult ? moveResult.successfulIssues.length : -1;
       const failedCount = moveResult ? moveResult.totalIssueCount - movedCount : -1;
-      const renderedIssuesMovedResult = issueMoveEditOutcome.result ? <span># work items {props.bulkOperationMode === 'Move' ? 'moved' : 'edited'}: <Lozenge appearance="success">{movedCount}</Lozenge></span> : null;
+      const renderedMovedSuffix = movedCount > countOfIssuesToMoveOrEdit.current ? <span>{' '}(some work items had children that were also moved)</span> : null;
+      const renderedIssuesMovedResult = issueMoveEditOutcome.result ? <span># work items {props.bulkOperationMode === 'Move' ? 'moved' : 'edited'}: <><Lozenge appearance="success">{movedCount}</Lozenge>{renderedMovedSuffix}</></span> : null;
       const renderedIssuesNotMovedResult = issueMoveEditOutcome.result ? <span># work items not {props.bulkOperationMode === 'Move' ? 'moved' : 'edited'}: <Lozenge appearance="removed">{failedCount}</Lozenge></span> : null;
       const renderedOutcomeDebugJson = showDebug ? <pre>{JSON.stringify(issueMoveEditOutcome, null, 2)}</pre> : null;
       const progressPercent = issueMoveEditOutcome.progress ?? 0;
@@ -388,9 +398,9 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
   }
 
   return (
-    <div >
+    <div>
       <FormSection>
-        {sendBulkNotificationToggle()}
+        {renderSendBulkNotificationToggle()}
       </FormSection>
       {renderEditSummary()}
       <FormSection>

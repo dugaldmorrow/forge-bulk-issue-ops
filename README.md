@@ -10,6 +10,10 @@ The motivation behind the creation of the app was to constrain bulk work item op
 * Ability to include logic specifying the allow target rojects of a move operation based on the selected work items; and
 * Ability to include logic to restrict which work item fields are editable.
 
+The following screenshot illustrates the app with its support for rendering in light and dark modes:
+
+![Screenshot of the Forge Bulk Issue Operations app](./image/bulk-edit-light-dark-mode.png)
+
 ## Setup
 
 See [Set up Forge](https://developer.atlassian.com/platform/forge/set-up-forge/) for instructions to get set up.
@@ -130,6 +134,7 @@ Where possible, known issues are documented in the relevant locations in the cod
 * KNOWN-15: All validation is done in the browser which means a user can circumvent the validation. As such, this app should only be used where all potential users are trusted.
 * KNOWN-16: Jira allows labels to have odd characters like quotes, new lines, etc, but these exotically encoded labels cause havoc
 *           when passing as parameters agaist the REST API.
+* KNOWN-17: Inadequate handling of the inability to retrieve an issue subtask.
 
 
 # Edit field support

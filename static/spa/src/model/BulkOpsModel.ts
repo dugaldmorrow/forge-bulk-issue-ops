@@ -48,6 +48,26 @@ export class BulkOpsModel<StepNameSubtype extends StepName> {
     return this.stepSequence;
   }
 
+  public getDownstreamSteps = (stepName: StepNameSubtype): StepNameSubtype[] => {
+    const stepIndex = this.stepSequence.indexOf(stepName);
+    if (stepIndex === -1) {
+      throw new Error(`Step "${stepName}" not found in step sequence.`);
+    }
+    return this.stepSequence.slice(stepIndex + 1);
+  }
+
+  public getNextDownstreamStep = (stepName: StepNameSubtype): StepNameSubtype | undefined => {
+    const stepIndex = this.stepSequence.indexOf(stepName);
+    if (stepIndex === -1) {
+      throw new Error(`Step "${stepName}" not found in step sequence.`);
+    }
+    const nextStepIndex = stepIndex + 1;
+    if (nextStepIndex < this.stepSequence.length) {
+      return this.stepSequence[nextStepIndex];
+    }
+    return undefined; // No next step
+  }
+
   public updateModelTimestamp = (): void => {
     const now = Date.now();
     const updated = now !== this.lastUpdateTimestamp;

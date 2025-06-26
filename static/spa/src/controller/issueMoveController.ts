@@ -7,6 +7,9 @@ import jiraDataModel from "../model/jiraDataModel";
 import { TargetMandatoryFields } from "../types/TargetMandatoryField";
 import { InvocationResult } from "../types/InvocationResult";
 import bulkIssueTypeMappingModel from "../model/bulkIssueTypeMappingModel";
+import { ObjectMapping } from "src/types/ObjectMapping";
+import { expandIssueArrayToIncludeSubtasks } from "src/model/issueSelectionUtil";
+import { subtaskMoveStrategy } from "src/extension/bulkOperationStaticRules";
 
 const issueMovePollPeriodMillis = 1000;
 
@@ -26,16 +29,26 @@ class IssueMoveController {
     }
 
     const allIssueTypes: IssueType[] = issueTypesInvocationResult.data;
-    const destinationProject = allProjectsSearchInfo.values.find(project => project.id === destinationProjectId);
+    let destinationProject = allProjectsSearchInfo.values.find(project => project.id === destinationProjectId);
+    if (!destinationProject) {
+      const destinationProjectInvocationResult = await jiraDataModel.getProjectByIdOrKey(destinationProjectId);
+      if (destinationProjectInvocationResult.ok) {
+        destinationProject = destinationProjectInvocationResult.data;
+      } else {
+        console.warn(` * Failed to find destination project with ID ${destinationProjectId}: ${destinationProjectInvocationResult.errorMessage}`);
+      }
+    }
     if (destinationProject) {
       const bulkIssueMoveRequestDataBuilder = new BulkIssueMoveRequestDataBuilder();
       const projectIssueTypeKeysToBuilders = new Map<string, ProjectIssueTypeClassificationBuilder>();
 
       // Step 1: Arrange issues into arrays by target issue type
       const sourceIssueTypeIdsToTargetIssueTypes = new Map<string, IssueType>();
-      // const sourceIssueTypeIdsToSourceIssues = new Map<string, Issue[]>();
       const targetIssueTypeIdsToSourceIssues = new Map<string, Issue[]>();
-      for (const issue of issues) {
+      const issuesToMove = subtaskMoveStrategy === 'move-subtasks-explicitly-with-parents' ?
+        await expandIssueArrayToIncludeSubtasks(issues) : issues;
+      for (const issue of issuesToMove) {
+        console.log(`issueMoveController.initiateMove: Processing issue ${issue.key} (type: ${issue.fields.issuetype.name})`);
         const sourceProjectId = issue.fields.project.id;
         const sourceIssueTypeId = issue.fields.issuetype.id;
         const targetIssueTypeId = bulkIssueTypeMappingModel.getTargetIssueTypeId(sourceProjectId, sourceIssueTypeId);
@@ -45,6 +58,7 @@ class IssueMoveController {
 
           const targetMandatoryFields = targetIssueTypeIdsToTargetMandatoryFields.get(targetIssueTypeId);
           if (targetMandatoryFields) {
+            console.log(`issueMoveController.initiateMove: Found target mandatory fields for source issue ${issue.key} (type: ${issue.fields.issuetype.name} / ${sourceIssueTypeId}) and target issue type ${targetIssueTypeId}: ${JSON.stringify(targetMandatoryFields, null, 2)}`);
             targetIssueTypeIdsToTargetMandatoryFields.set(targetIssueTypeId, targetMandatoryFields);
           } else {
             throw new Error(`Internal error: no target mandatory fields found for source issue type ${sourceIssueTypeId}`);
@@ -63,6 +77,7 @@ class IssueMoveController {
 
       // Step 2: Iterate over issue types so that all issues of the same type are dealt with together since this
       //         is how the bulk move API payload needs to be formatted.
+      const issueIdsToIssuesAddedToRequest: ObjectMapping<Issue> = {};
       const targetIssueTypes: IssueType[] = Array.from(sourceIssueTypeIdsToTargetIssueTypes.values());
       for (const targetIssueType of targetIssueTypes) {
         const issuesOfType = targetIssueTypeIdsToSourceIssues.get(targetIssueType.id);
@@ -72,11 +87,17 @@ class IssueMoveController {
             .setInferClassificationDefaults(true)
             .setInferFieldDefaults(true)
             .setInferStatusDefaults(true)
-            .setInferSubtaskTypeDefault(true)
+            .setInferSubtaskTypeDefault(false)
             .setTargetClassification([])
             .setTargetMandatoryFields([]);
           for (const issueOfType of issuesOfType) {
-            projectIssueTypeClassificationBuilder.addIssueIdOrKey(issueOfType.id);
+            const issueAlreadyAdded = issueIdsToIssuesAddedToRequest[issueOfType.id];
+            if (issueAlreadyAdded) {
+              console.warn(` * Issue with ID ${issueOfType.id} already added to the request. Skipping.`);
+            } else {
+              projectIssueTypeClassificationBuilder.addIssueIdOrKey(issueOfType.id);
+              issueIdsToIssuesAddedToRequest[issueOfType.id] = issueOfType;
+            }
           }
           const targetMandatoryFields: TargetMandatoryFields = targetIssueTypeIdsToTargetMandatoryFields.get(
             targetIssueType.id);
@@ -87,15 +108,19 @@ class IssueMoveController {
               .setTargetMandatoryFields([targetMandatoryFields]);
           }
           projectIssueTypeKeysToBuilders.set(projectIssueTypeKey, projectIssueTypeClassificationBuilder);
-            bulkIssueMoveRequestDataBuilder.addMapping(
-              destinationProject.id,
-              targetIssueType.id,
-              projectIssueTypeClassificationBuilder.build()
+          const destinationParentKeyOrId = '';
+          bulkIssueMoveRequestDataBuilder.addMapping(
+            destinationProject.id,
+            targetIssueType.id,
+            destinationParentKeyOrId,
+            projectIssueTypeClassificationBuilder.build()
           );
         } else {
           throw new Error(`Internal error: no issues found for issue type ${targetIssueType.id}`);
         }
       }
+      const issueIdsAdded = Object.keys(issueIdsToIssuesAddedToRequest);
+      console.log(` * Added ${issueIdsAdded.length} issues to the bulk move request: ${issueIdsAdded.join(', ')}`);
 
       // Step 3: Build the bulk issue move request data
       bulkIssueMoveRequestDataBuilder.setSendBulkNotification(sendBulkNotification);
@@ -111,6 +136,10 @@ class IssueMoveController {
         } else {
           console.warn(` * Initiation of bulk move request resulted in an error: ${requestOutcome.errors}`);
         }
+
+        // Step 5: Before returning, invalidate cached issue keys
+        await jiraDataModel.invalidateCachedIssueKeys();
+
         return requestOutcome;
       } else {
         console.warn(` * Initiation of bulk move request resulted in an API error: ${invocationResult.errorMessage}`);
@@ -125,6 +154,10 @@ class IssueMoveController {
         return requestOutcome;
       }
     } else {
+      console.log(`Dumping all projects search info: `);
+      for (const project of allProjectsSearchInfo.values) {
+        console.log(` * Project: ${project.id} = ${project.name} (${project.key})`);
+      }
       throw new Error(`Destination project ${destinationProjectId} not found`);
     }
   }
