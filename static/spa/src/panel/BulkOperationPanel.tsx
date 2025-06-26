@@ -18,7 +18,7 @@ import FieldMappingPanel, { FieldMappingsState, nilFieldMappingsState } from './
 import targetProjectFieldsModel from 'src/controller/TargetProjectFieldsModel';
 import { IssueSelectionPanel } from '../widget/IssueSelectionPanel';
 import bulkOperationRuleEnforcer from 'src/extension/bulkOperationRuleEnforcer';
-import { allowBulkEditsFromMultipleProjects, allowBulkMovesFromMultipleProjects, allowMoveIssuesWithSubtasks, enableTheAbilityToBulkChangeResolvedIssues, advancedFilterModeEnabled, filterModeDefault, showLabelsSelect } from '../extension/bulkOperationStaticRules';
+import { allowBulkEditsFromMultipleProjects, allowBulkMovesFromMultipleProjects, subtaskMoveStrategy, enableTheAbilityToBulkChangeResolvedIssues, advancedFilterModeEnabled, filterModeDefault, showLabelsSelect } from '../extension/bulkOperationStaticRules';
 import { BulkOperationMode } from 'src/types/BulkOperationMode';
 import IssueTypeMappingPanel from './IssueTypeMappingPanel';
 import { ObjectMapping } from 'src/types/ObjectMapping';
@@ -274,7 +274,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
         return "multiple-issue-types";
       }
     }
-    if (!allowMoveIssuesWithSubtasks && props.bulkOperationMode === 'Move') {
+    if (subtaskMoveStrategy === 'issues-with-subtasks-can-not-be-moved' && props.bulkOperationMode === 'Move') {
       const issuesWithSubtasks = jiraUtil.getIssuesWithSubtasks(selectedIssues);
       if (issuesWithSubtasks.length > 0) {
         return "invalid-subtasks-selected";
@@ -283,7 +283,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     return "valid";
   }
 
-  const onIssuesLoaded = (allSelected: boolean, newIssueSearchInfo: IssueSearchInfo) => {
+  const onIssuesLoaded = async (allSelected: boolean, newIssueSearchInfo: IssueSearchInfo) => {
     const newlySelectedIssues = newIssueSearchInfo.issues;
     const newIssueSelectionState: IssueSelectionState = {
       uuid: newIssueSelectionUuid(),
@@ -294,7 +294,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     setIssueSelectionState(newIssueSelectionState);
     setSelectedIssuesTime(Date.now());
     // console.log(`BulkOperationPanel: onIssuesLoaded: newlySelectedIssues = ${newlySelectedIssues.map(issue => issue.key).join(', ')}`);
-    targetProjectFieldsModel.setSelectedIssues(newlySelectedIssues, allIssueTypes);
+    await targetProjectFieldsModel.setSelectedIssues(newlySelectedIssues, allIssueTypes);
     setIssueSearchInfo(newIssueSearchInfo);
     setIssueSearchInfoTime(Date.now());
     setLastDataLoadTime(Date.now());
@@ -313,7 +313,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     // console.log(`BulkOperationPanel.onIssuesSelectionChange: new issue selection state = ${selectionToString(newIssueSelectionState)}`);
     setIssueSelectionState(newIssueSelectionState);
     setSelectedIssuesTime(Date.now());
-    targetProjectFieldsModel.setSelectedIssues(newIssueSelectionState.selectedIssues, allIssueTypes);
+    await targetProjectFieldsModel.setSelectedIssues(newIssueSelectionState.selectedIssues, allIssueTypes);
     // Clear downstream state...
     clearStepStateAfter('issue-selection');
     setStepCompletionState('issue-selection', newIssueSelectionState.selectionValidity === 'valid' ? 'complete' : 'incomplete');
@@ -381,16 +381,16 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       const joinedErrors = issueSearchInfo.errorMessages.join( );
       setMainWarningMessage(joinedErrors);
     } else {
-      onIssuesLoaded(true, issueSearchInfo);
+      await onIssuesLoaded(true, issueSearchInfo);
     }
     const issueCount = issueSearchInfo.issues.length;
     setStepCompletionState('filter', issueCount > 0 ? 'complete' : 'incomplete');
     setIssueLoadingState('idle');
   }
   
-  const updateFieldMappingState = (selectedargetProject: Project) => {
+  const updateFieldMappingState = async (selectedargetProject: Project) => {
     updateFieldMappingsIfNeeded(selectedargetProject);
-    targetProjectFieldsModel.setSelectedIssues(issueSelectionState.selectedIssues, allIssueTypes);
+    await targetProjectFieldsModel.setSelectedIssues(issueSelectionState.selectedIssues, allIssueTypes);
     setStepCompletionState('field-mapping', isFieldMappingsComplete() ? 'complete' : 'incomplete');
     setStepCompletionState('target-project-selection', selectedargetProject ? 'complete' : 'incomplete');
     updateMappingsCompletionStates();
@@ -403,7 +403,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     // Clear downstream state...
     clearStepStateAfter('target-project-selection');
     // Automatically update field mappings if possible
-    updateFieldMappingState(selectedProject);
+    await updateFieldMappingState(selectedProject);
   }
 
   const buildFieldMappingsState = async (selectedToProject: undefined | Project): Promise<FieldMappingsState> => {
@@ -454,10 +454,10 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     }
   }
 
-  const onAllDefaultValuesProvided = (allDefaultValuesProvided: boolean) => {
+  const onAllDefaultValuesProvided = async (allDefaultValuesProvided: boolean): Promise<void> => {
     // console.log(`BulkOperationPanel: onAllDefaultValuesProvided: ${allDefaultValuesProvided}`);
     setAllDefaultValuesProvided(allDefaultValuesProvided);
-    updateFieldMappingState(selectedToProject);
+    await updateFieldMappingState(selectedToProject);
   }
 
   const onIssueTypeMappingChange = async (
@@ -469,12 +469,12 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       // console.log(`BulkOperationPanel.onIssueTypeMappingChange: Received onIssueTypeMappingChange with the current issue selection state.`);
       // const allIssuesAreMapped = bulkIssueTypeMappingModel.areAllIssueTypesMapped(issueSelectionState.selectedIssues);
       // console.log(`BulkOperationPanel.onIssueTypeMappingChange:\n * originalMappingCount = ${originalMappingCount};\n * newMappingCount = ${newMappingCount};\n * allIssuesAreMapped = ${allIssuesAreMapped};\n * selectedIssues = ${issueSelectionState.selectedIssues.map(issue => issue.key).join(', ')};`);
-      targetProjectFieldsModel.setSelectedIssues(issueSelectionState.selectedIssues, allIssueTypes);
+      await targetProjectFieldsModel.setSelectedIssues(issueSelectionState.selectedIssues, allIssueTypes);
       const allIssueTypesMapped = bulkIssueTypeMappingModel.areAllIssueTypesMapped(issueSelectionState.selectedIssues);
       setAllIssueTypesMapped(allIssueTypesMapped);
       const issueTypeMappingCompletionState = issueSelectionState.selectionValidity === 'valid' && allIssueTypesMapped ? 'complete' : 'incomplete';
       setStepCompletionState('issue-type-mapping', issueTypeMappingCompletionState);
-      updateFieldMappingState(selectedToProject);
+      await updateFieldMappingState(selectedToProject);
     } else {
       // console.log(`BulkOperationPanel.onIssueTypeMappingChange: Received onIssueTypeMappingChange with a stale issue selection state.`);
     }
@@ -714,6 +714,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
           {renderStartFieldMappingButton()}
           {renderFieldMappingIndicator()}
           <IssueTypeMappingPanel
+            allIssueTypes={allIssueTypes}
             issueSelectionState={issueSelectionState}
             targetProject={selectedToProject}
             bulkOperationMode={bulkOperationMode}

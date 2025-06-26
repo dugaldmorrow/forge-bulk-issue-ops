@@ -27,10 +27,19 @@ export const enableTheAbilityToBulkChangeResolvedIssues = false;
 export const excludedIssueStatuses: string[] = [];
 
 /**
- * If this is true, the bulk move and edit operations will allow moving issues with subtasks. It is
- * set to false, though, because moving issues with subtasks often causes errors in Jira.
+ * The following type and associated constant defines the strategy for moving subtasks during bulk operations.
  */
-export const allowMoveIssuesWithSubtasks = false;
+export type SubtaskMoveStrategy =
+  'issues-with-subtasks-can-not-be-moved' |
+  'move-subtasks-explicitly-with-parents';
+export const subtaskMoveStrategy: SubtaskMoveStrategy = 'move-subtasks-explicitly-with-parents';
+
+/**
+ * This constant determines whether the issue type move mappings are restricted to the same hierarchy level. Bulk moves
+ * will fail if this is false and the user has selected issues with subtasks, but has mapped the subtask to an issue type
+ * with a higher hierarchy level.
+ */
+export const restrictIssueTypeMoveMappingsToSameHierarchyLevel = true;
 
 export const showLabelsSelect = false;
 

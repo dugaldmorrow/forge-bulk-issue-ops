@@ -14,6 +14,6 @@ export type IssueType = {
   untranslatedName: string // e.g. "Subtask",
   subtask: boolean // e.g. true,
   avatarId?: number // e.g. 10316,
-  hierarchyLevel: number // e.g. -1,
+  hierarchyLevel: number // e.g. -1 for Sub-task, 0 for Story, 1 for Epic, etc.
   scope?: IssueTypeScope // Details of the next-gen projects the issue type is available in.
 }

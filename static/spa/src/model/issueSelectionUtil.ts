@@ -1,4 +1,6 @@
+import { Issue } from "src/types/Issue";
 import { IssueSelectionState } from "../types/IssueSelectionState";
+import jiraDataModel from "./jiraDataModel";
 
 export const equalIssueSelections = (selectionA: IssueSelectionState, selectionB: IssueSelectionState): boolean => {
   const equal = selectionA.uuid === selectionB.uuid;
@@ -30,4 +32,41 @@ export const newIssueSelectionUuid = (): string => {
 export const selectionToString = (issueSelection: IssueSelectionState): string => {
   const issueKeys = issueSelection.selectedIssues.map(issue => issue.key).join(', ');
   return `IssueSelectionState(uuid=${issueSelection.uuid}, issues=[${issueKeys}], validity=${issueSelection.selectionValidity})`;
+}
+
+export const expandIssueArrayToIncludeSubtasks = async (issues: Issue[]): Promise<Issue[]> => {
+  const expandedIssuesArray: Issue[] = [];
+  for (const issue of issues) {
+    expandedIssuesArray.push(issue);
+    if (issue.fields.subtasks && issue.fields.subtasks.length > 0) {
+      for (const subtask of issue.fields.subtasks) {
+        const subtaskIssue: Issue = await jiraDataModel.getIssueByIdOrKey(subtask.id);
+        if (subtaskIssue) {
+          expandedIssuesArray.push(subtaskIssue);
+        } else {
+          // KNOWN-17: This may not be handled fully and may lead to errors
+          console.error(`Failed to fetch subtask with ID ${subtask.id} for issue ${issue.key}`);
+        }
+      }
+    }
+  }
+  return expandedIssuesArray;
+}
+
+export const extractSubtasks = async (issues: Issue[]): Promise<Issue[]> => {
+  const subtasks: Issue[] = [];
+  for (const issue of issues) {
+    if (issue.fields.subtasks && issue.fields.subtasks.length > 0) {
+      for (const subtask of issue.fields.subtasks) {
+        const subtaskIssue: Issue = await jiraDataModel.getIssueByIdOrKey(subtask.id);
+        if (subtaskIssue) {
+          subtasks.push(subtaskIssue);
+        } else {
+          // KNOWN-17: This may not be handled fully and may lead to errors
+          console.error(`Failed to fetch subtask with ID ${subtask.id} for issue ${issue.key}`);
+        }
+      }
+    }
+  }
+  return subtasks;
 }

@@ -40,7 +40,7 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     setStateValidity(selectionValidity);
   }, [props.issueSearchInfo.issues]);
 
-  const onToggleIssueSelection = (issueToToggle: Issue) => {
+  const onToggleIssueSelection = async (issueToToggle: Issue): Promise<void> => {
     const newSelectedIssues: Issue[] = [];
     for (const issue of props.issueSearchInfo.issues) {
       const existingSelectedIssueKey = props.selectedIssues.find((selectedIssue: Issue) => {
@@ -66,10 +66,10 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
       selectedIssues: newSelectedIssues,
       selectionValidity: selectionValidity
     }
-    props.onIssuesSelectionChange(issueSelectionState);
+    await props.onIssuesSelectionChange(issueSelectionState);
   }
 
-  const onSelectAllIssues = () => {
+  const onSelectAllIssues = async (): Promise<void> => {
     const newSelectedIssues: Issue[] = [];
     let changeDetected = false;
     for (const issue of props.issueSearchInfo.issues) {
@@ -85,10 +85,10 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
       selectedIssues: newSelectedIssues,
       selectionValidity: selectionValidity
     }
-    props.onIssuesSelectionChange(issueSelectionState);
+    await props.onIssuesSelectionChange(issueSelectionState);
   }
 
-  const onDeselectAllIssues = () => {
+  const onDeselectAllIssues = async (): Promise<void> => {
     let changeDetected = false;
     for (const issue of props.issueSearchInfo.issues) {
       const currentlySelected = props.selectedIssues.find(selectedIssue => selectedIssue.key === issue.key);
@@ -101,7 +101,7 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
       selectedIssues: [],
       selectionValidity: selectionValidity
     }
-    props.onIssuesSelectionChange(issueSelectionState);
+    await props.onIssuesSelectionChange(issueSelectionState);
   }
 
   const renderIssueLoading = () => {

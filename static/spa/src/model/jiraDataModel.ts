@@ -53,6 +53,7 @@ class JiraDataModel {
   private cachedFields: Field[] = [];
   private fieldAndContextIdsToCustomFieldContextOptions = new Map<string, CustomFieldContextOption[]>();
   private projectIdsToProjectCreateIssueMetadata = new Map<string, ProjectCreateIssueMetadata>();
+  private cachedIssueIdsAndKeysToIssues: ObjectMapping<Issue> = {};
   private issueIdsOrKeysToEditIssueMetadata = new Map<string, EditIssueMetadata>();
   private labelPagesToLabels: ObjectMapping<string[]> = {};
 
@@ -187,6 +188,10 @@ class JiraDataModel {
     if (response.ok) {
       const issuesSearchInfo = await response.json();
       // console.log(`issuesSearchInfo: ${JSON.stringify(issuesSearchInfo, null, 2)}`);
+      issuesSearchInfo.issues.forEach((issue: Issue) => {
+        this.cachedIssueIdsAndKeysToIssues[issue.id] = issue;
+        this.cachedIssueIdsAndKeysToIssues[issue.key] = issue;
+      })
       return issuesSearchInfo;
     } else {
       const errorText = await response.text();
@@ -199,6 +204,31 @@ class JiraDataModel {
         issues: []
       };
       return issueSearchInfo;
+    }
+  }
+
+  getIssueByIdOrKey = async (issueIdOrKey: string): Promise<Issue> => {
+    const cachedIssue = this.cachedIssueIdsAndKeysToIssues[issueIdOrKey];
+    if (cachedIssue) {
+      // console.log(`JiraDataModel.getIssueByIdOrKey: Returning cached issue for ${issueIdOrKey}`);
+      return cachedIssue;
+    } else {
+      // console.log(`JiraDataModel.getIssueByIdOrKey: Fetching issue for ${issueIdOrKey}`);
+      const response = await requestJira(`/rest/api/3/issue/${issueIdOrKey}`, {
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      if (response.ok) {
+        const issue = await response.json() as Issue;
+        this.cachedIssueIdsAndKeysToIssues[issue.id] = issue;
+        this.cachedIssueIdsAndKeysToIssues[issue.key] = issue;
+        return issue;
+      } else {
+        const errorText = await response.text();
+        console.error(`Failed to fetch issue ${issueIdOrKey}: ${response.status}: ${errorText}`);
+        throw new Error(`Failed to fetch issue ${issueIdOrKey}: ${response.status}: ${errorText}`);
+      }
     }
   }
   

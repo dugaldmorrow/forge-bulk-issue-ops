@@ -8,6 +8,8 @@ import { TargetMandatoryFields } from "../types/TargetMandatoryField";
 import { InvocationResult } from "../types/InvocationResult";
 import bulkIssueTypeMappingModel from "../model/bulkIssueTypeMappingModel";
 import { ObjectMapping } from "src/types/ObjectMapping";
+import { expandIssueArrayToIncludeSubtasks } from "src/model/issueSelectionUtil";
+import { subtaskMoveStrategy } from "src/extension/bulkOperationStaticRules";
 
 const issueMovePollPeriodMillis = 1000;
 
@@ -17,14 +19,13 @@ class IssueMoveController {
     destinationProjectId: string,
     issues: Issue[],
     targetIssueTypeIdsToTargetMandatoryFields: Map<string, TargetMandatoryFields>,
-    moveSubtasks: boolean,
     sendBulkNotification: boolean,
   ): Promise<IssueMoveEditRequestOutcome> => {
     const allProjectsSearchInfo = await jiraDataModel.pageOfProjectSearchInfo('');
     const issueTypesInvocationResult: InvocationResult<IssueType[]> = await jiraDataModel.getIssueTypes();
     if (!issueTypesInvocationResult.ok) {
       await this.delay(2000);
-      return await this.initiateMove(destinationProjectId, issues, targetIssueTypeIdsToTargetMandatoryFields, moveSubtasks, sendBulkNotification);
+      return await this.initiateMove(destinationProjectId, issues, targetIssueTypeIdsToTargetMandatoryFields, sendBulkNotification);
     }
 
     const allIssueTypes: IssueType[] = issueTypesInvocationResult.data;
@@ -43,9 +44,11 @@ class IssueMoveController {
 
       // Step 1: Arrange issues into arrays by target issue type
       const sourceIssueTypeIdsToTargetIssueTypes = new Map<string, IssueType>();
-      // const sourceIssueTypeIdsToSourceIssues = new Map<string, Issue[]>();
       const targetIssueTypeIdsToSourceIssues = new Map<string, Issue[]>();
-      for (const issue of issues) {
+      const issuesToMove = subtaskMoveStrategy === 'move-subtasks-explicitly-with-parents' ?
+        await expandIssueArrayToIncludeSubtasks(issues) : issues;
+      for (const issue of issuesToMove) {
+        console.log(`issueMoveController.initiateMove: Processing issue ${issue.key} (type: ${issue.fields.issuetype.name})`);
         const sourceProjectId = issue.fields.project.id;
         const sourceIssueTypeId = issue.fields.issuetype.id;
         const targetIssueTypeId = bulkIssueTypeMappingModel.getTargetIssueTypeId(sourceProjectId, sourceIssueTypeId);
@@ -55,6 +58,7 @@ class IssueMoveController {
 
           const targetMandatoryFields = targetIssueTypeIdsToTargetMandatoryFields.get(targetIssueTypeId);
           if (targetMandatoryFields) {
+            console.log(`issueMoveController.initiateMove: Found target mandatory fields for source issue ${issue.key} (type: ${issue.fields.issuetype.name} / ${sourceIssueTypeId}) and target issue type ${targetIssueTypeId}: ${JSON.stringify(targetMandatoryFields, null, 2)}`);
             targetIssueTypeIdsToTargetMandatoryFields.set(targetIssueTypeId, targetMandatoryFields);
           } else {
             throw new Error(`Internal error: no target mandatory fields found for source issue type ${sourceIssueTypeId}`);
@@ -83,7 +87,7 @@ class IssueMoveController {
             .setInferClassificationDefaults(true)
             .setInferFieldDefaults(true)
             .setInferStatusDefaults(true)
-            .setInferSubtaskTypeDefault(moveSubtasks)
+            .setInferSubtaskTypeDefault(false)
             .setTargetClassification([])
             .setTargetMandatoryFields([]);
           for (const issueOfType of issuesOfType) {
@@ -104,10 +108,12 @@ class IssueMoveController {
               .setTargetMandatoryFields([targetMandatoryFields]);
           }
           projectIssueTypeKeysToBuilders.set(projectIssueTypeKey, projectIssueTypeClassificationBuilder);
-            bulkIssueMoveRequestDataBuilder.addMapping(
-              destinationProject.id,
-              targetIssueType.id,
-              projectIssueTypeClassificationBuilder.build()
+          const destinationParentKeyOrId = '';
+          bulkIssueMoveRequestDataBuilder.addMapping(
+            destinationProject.id,
+            targetIssueType.id,
+            destinationParentKeyOrId,
+            projectIssueTypeClassificationBuilder.build()
           );
         } else {
           throw new Error(`Internal error: no issues found for issue type ${targetIssueType.id}`);

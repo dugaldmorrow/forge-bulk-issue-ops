@@ -134,6 +134,7 @@ Where possible, known issues are documented in the relevant locations in the cod
 * KNOWN-15: All validation is done in the browser which means a user can circumvent the validation. As such, this app should only be used where all potential users are trusted.
 * KNOWN-16: Jira allows labels to have odd characters like quotes, new lines, etc, but these exotically encoded labels cause havoc
 *           when passing as parameters agaist the REST API.
+* KNOWN-17: Inadequate handling of the inability to retrieve an issue subtask.
 
 
 # Edit field support

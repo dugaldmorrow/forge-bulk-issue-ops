@@ -151,7 +151,8 @@ class BulkOperationRuleEnforcer {
 
       // The following is a simple example to avoid changing parenting of issues by identifying 
       // issue types based on their names. It would be more robust to use the issue type IDs.
-      if (issueType.name === 'Epic' || issueType.name === 'Sub-task' || issueType.name === 'Bug') {
+      // if (issueType.name === 'Epic' || issueType.name === 'Sub-task' || issueType.name === 'Bug') {
+      if (issueType.name === 'Epic' || issueType.name === 'Bug') {
         return false;
       }
 
