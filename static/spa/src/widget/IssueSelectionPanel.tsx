@@ -15,13 +15,9 @@ import CrossCircleIcon from '@atlaskit/icon/core/cross-circle';
 import { PanelMessage, renderPanelMessage } from "./PanelMessage";
 import { BulkOperationMode } from "src/types/BulkOperationMode";
 import { maxIssueSearchResults } from "src/model/jiraDataModel";
-
-export type IssueSelectionValidity = "valid" | "invalid-no-issues-selected" | "multiple-projects" | "multiple-issue-types" | "invalid-subtasks-selected";
-
-export type IssueSelectionState = {
-  selectedIssues: Issue[];
-  selectionValidity: IssueSelectionValidity;
-}
+import { IssueSelectionValidity } from "src/types/IssueSelectionValidity";
+import { IssueSelectionState } from "src/types/IssueSelectionState";
+import { newIssueSelectionUuid } from "src/model/issueSelectionUtil";
 
 export type IssueSelectionPanelProps = {
   loadingState: LoadingState;
@@ -66,6 +62,7 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     const selectionValidity = props.computeSelectionValidity(newSelectedIssues);
     setStateValidity(selectionValidity);
     const issueSelectionState: IssueSelectionState = {
+      uuid: newIssueSelectionUuid(),
       selectedIssues: newSelectedIssues,
       selectionValidity: selectionValidity
     }
@@ -84,6 +81,7 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     const selectionValidity = props.computeSelectionValidity(newSelectedIssues);
     setStateValidity(selectionValidity);
     const issueSelectionState: IssueSelectionState = {
+      uuid: newIssueSelectionUuid(),
       selectedIssues: newSelectedIssues,
       selectionValidity: selectionValidity
     }
@@ -99,6 +97,7 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     const selectionValidity = props.computeSelectionValidity([]);
     setStateValidity(selectionValidity);
     const issueSelectionState: IssueSelectionState = {
+      uuid: newIssueSelectionUuid(),
       selectedIssues: [],
       selectionValidity: selectionValidity
     }

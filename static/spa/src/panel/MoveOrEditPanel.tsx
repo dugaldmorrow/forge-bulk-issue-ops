@@ -24,7 +24,7 @@ import { TaskStatusLozenge } from 'src/widget/TaskStatusLozenge';
 import { formatProject } from 'src/controller/formatters';
 import issueEditController from 'src/controller/issueEditController';
 import { uuid } from 'src/model/util';
-import { IssueSelectionState } from 'src/widget/IssueSelectionPanel';
+import { IssueSelectionState } from '../types/IssueSelectionState';
 import { allowMoveIssuesWithSubtasks } from 'src/extension/bulkOperationStaticRules';
 
 const showDebug = false;

@@ -28,7 +28,7 @@ import { FlagOptions, showFlag } from '@forge/bridge';
 import { uuid } from 'src/model/util';
 import { requireFieldEditErrorAcknowledgement } from 'src/model/config';
 import { CascadingSelect, CascadingSelectValue } from './CascadingSelect';
-import { IssueSelectionState } from './IssueSelectionPanel';
+import { IssueSelectionState } from '../types/IssueSelectionState';
 import { FixVersionEditor, FixVersionEditorValue } from './FixVersionEditor';
 import { ComponentsEditor, ComponentsEditorValue } from './ComponentsEditor';
 import { EditOptionSelect } from './EditOptionSelect';

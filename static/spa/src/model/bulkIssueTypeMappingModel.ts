@@ -18,6 +18,10 @@ class bulkIssueTypeMappingModel {
     return true;
   }
 
+  getMappingsCount = (): number => {
+    return this.sourceToTargetIssueTypeIds.size;
+  }
+
   clearMappings = (): void => {
     // console.log('bulkIssueTypeMappingModelModel.clearMappings');
     this.sourceToTargetIssueTypeIds.clear();

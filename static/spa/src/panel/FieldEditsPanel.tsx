@@ -11,8 +11,8 @@ import editedFieldsModel, { EditState } from 'src/model/editedFieldsModel';
 import { FieldEditValue } from 'src/types/FieldEditValue';
 import CrossCircleIcon from '@atlaskit/icon/core/cross-circle';
 import { OperationOutcome } from 'src/types/OperationOutcome';
-import { IssueSelectionState } from 'src/widget/IssueSelectionPanel';
 import { PanelMessage } from 'src/widget/PanelMessage';
+import { IssueSelectionState } from 'src/types/IssueSelectionState';
 
 const currentIssuesDebugEnabled = false;
 const editedFieldsDebugEnabled = false;

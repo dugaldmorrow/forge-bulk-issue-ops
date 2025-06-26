@@ -34,6 +34,7 @@ const ProjectsSelect = (props: ProjectsSelectProps) => {
     let filteredProjects = projectsToFilter;
     if (props.filterProjects) {
       filteredProjects = await props.filterProjects(projectsToFilter);
+      // console.log(`ProjectsSelect.filterProjects: filteredProjects = ${filteredProjects.map(project => project.key).join(', ')}`);
     }
     setFilteredProjects(filteredProjects);
     return filteredProjects;
