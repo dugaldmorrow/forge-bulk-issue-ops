@@ -19,7 +19,8 @@ import {
   advancedFilterModeEnabled,
   filterModeDefault,
   showLabelsSelect,
-  excludedIssueStatuses
+  excludedIssueStatuses,
+  maximumNumberOfIssuesToBulkActOn
 } from '../extension/bulkOperationStaticRules';
 import { BulkOperationMode } from '../types/BulkOperationMode';
 import { PanelMessage } from '../widget/PanelMessage';
@@ -136,7 +137,7 @@ export const FilterPanel = (props: FilterPanelProps) => {
 
   const executeSearch = async (jql: string): Promise<void> => {
     await props.onIssueSearchInitiated();
-    const issueSearchInfo = await jiraDataModel.getIssueSearchInfoByJql(jql) as IssueSearchInfo;
+    const issueSearchInfo = await jiraDataModel.getIssueSearchInfoByJql(jql, maximumNumberOfIssuesToBulkActOn);
     // console.log(`FilterPanel.executeSearch: issueSearchInfo: ${JSON.stringify(issueSearchInfo, null, 2)}`);
     const issueFilterResults = await filterRetrieveIssues(issueSearchInfo.issues);
     setIssueFilterResults(issueFilterResults);

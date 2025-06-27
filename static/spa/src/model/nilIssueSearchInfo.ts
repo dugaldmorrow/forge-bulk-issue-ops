@@ -2,9 +2,7 @@ import { IssueSearchInfo } from "../types/IssueSearchInfo"
 
 export const nilIssueSearchInfo = (): IssueSearchInfo => {
   return {
-    maxResults: 0,
-    startAt: 0,
-    total: 0,
+    nextPageToken: '',
     isLast: false,
     issues: []
   }

@@ -394,12 +394,13 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   const onIssueSearchCompleted = async (issueSearchInfo: IssueSearchInfo): Promise<void> => {
     clearStepStateAfter('filter');
 
-    if (issueSearchInfo.errorMessages && issueSearchInfo.errorMessages.length) {
-      const joinedErrors = issueSearchInfo.errorMessages.join( );
-      setMainWarningMessage(joinedErrors);
-    } else {
+    // KNOWN-18: Should handle the Jira API returning an error when searching for issues.
+    // if (issueSearchInfo.errorMessages && issueSearchInfo.errorMessages.length) {
+    //   const joinedErrors = issueSearchInfo.errorMessages.join( );
+    //   setMainWarningMessage(joinedErrors);
+    // } else {
       await onIssuesLoaded(true, issueSearchInfo);
-    }
+    // }
     const issueCount = issueSearchInfo.issues.length;
     updateStepCompletionState('filter', issueCount > 0 ? 'complete' : 'incomplete');
     setIssueLoadingState('idle');

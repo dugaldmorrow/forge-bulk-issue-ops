@@ -1,5 +1,13 @@
 
 /**
+ * This constant defines the maximum number of issues that can be selected for bulk operations. Make
+ * sure this dow not exceed the maximum number of issues that can be processed in a single bulk operation
+ * request in Jira Cloud. Since a maximum of 100 issues can searched in a single JQL query, going over
+ * this limit will result in multiple API requests and may make the UI less responsive.
+ */
+export const maximumNumberOfIssuesToBulkActOn = 100;
+
+/**
  * If set to true, this will allow a target project to be selected that is one of the projects from 
  * which the selected issues to move are already in.
  */

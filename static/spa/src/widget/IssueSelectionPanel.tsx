@@ -14,10 +14,11 @@ import { IssueLink } from "./IssueLink";
 import CrossCircleIcon from '@atlaskit/icon/core/cross-circle';
 import { PanelMessage, renderPanelMessage } from "./PanelMessage";
 import { BulkOperationMode } from "src/types/BulkOperationMode";
-import { maxIssueSearchResults } from "src/model/jiraDataModel";
 import { IssueSelectionValidity } from "src/types/IssueSelectionValidity";
 import { IssueSelectionState } from "src/types/IssueSelectionState";
 import { newIssueSelectionUuid } from "src/model/issueSelectionUtil";
+import { maximumNumberOfIssuesToBulkActOn } from "src/extension/bulkOperationStaticRules";
+import Tooltip from "@atlaskit/tooltip";
 
 export type IssueSelectionPanelProps = {
   loadingState: LoadingState;
@@ -272,20 +273,22 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
     if (props.issueSearchInfo.issues.length) {
       const containerStyle: any = {margin: '20px 0px'};
       if (!props.issueSearchInfo.isLast) {
-        let message = `Note: a maximum of ${maxIssueSearchResults} work items can be ${props.bulkOperationMode === 'Edit' ? 'edited' : 'moved'} at a time, but more works items match the search criteria.`;
-        if (props.issueSearchInfo.issues.length < maxIssueSearchResults) {
-          const filteredOutCount = maxIssueSearchResults - props.issueSearchInfo.issues.length;
+        let message = `Note: a maximum of ${maximumNumberOfIssuesToBulkActOn} work items can be ${props.bulkOperationMode === 'Edit' ? 'edited' : 'moved'} at a time, but more works items match the search criteria.`;
+        if (props.issueSearchInfo.issues.length < maximumNumberOfIssuesToBulkActOn) {
+          const filteredOutCount = maximumNumberOfIssuesToBulkActOn - props.issueSearchInfo.issues.length;
           message += ` ${filteredOutCount} work item${filteredOutCount > 1 ? 's were' : 'has been'} filtered out based on business rules.`
         } else {
 
         }
         renderedQuantityMessage = (
-          <div style={{marginBottom: '10px'}}>
-            <PanelMessage
-              className="info-banner"
-              message={message} 
-            />
-          </div>
+          <Tooltip content={`${props.selectedIssues.length} work items are currently selected.`}>
+            <div style={{marginBottom: '10px', cursor: 'help'}}>
+              <PanelMessage
+                className="info-banner"
+                message={message} 
+              />
+            </div>
+          </Tooltip>
         );
       } else {
         const message = `Found ${props.issueSearchInfo.issues.length} work items (${props.selectedIssues.length} selected)`;
@@ -331,13 +334,7 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
 
   const nilSearch =
     props.issueSearchInfo.issues.length === 0 &&
-    props.issueSearchInfo.total === 0 &&
-    props.issueSearchInfo.maxResults === 0;
-  return (
-    <>
-
-      {nilSearch ? renderPlaceholder() : props.issueSearchInfo.issues.length === 0 ? renderNoResults() : renderIssuesPanel()}
-    </>
-  );
+    props.issueSearchInfo.nextPageToken === '';
+  return nilSearch ? renderPlaceholder() : props.issueSearchInfo.issues.length === 0 ? renderNoResults() : renderIssuesPanel();
 
 }

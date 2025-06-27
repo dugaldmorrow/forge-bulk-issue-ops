@@ -1,8 +1,5 @@
 import { requestJira } from '@forge/bridge';
 import { invoke } from '@forge/bridge';
-import { getMockFieldConfigurationItems } from '../mock/mockGetMockFieldConfigurationItems';
-import { getMockFieldConfigurationSchemesForProjects } from '../mock/mockGetMockFieldConfigurationSchemesForProjects';
-import { getMockProjectSearchInfo } from '../mock/mockGetProjects';
 import { invokeBulkOpsApisAsTheAppUser, mockGetFieldConfigurationItems, mockGetFieldConfigurationSchemesForProjects, mockGetProjects } from './config';
 import { BulkIssueMoveRequestData } from "../types/BulkIssueMoveRequestData";
 import { CustomFieldsContextItem } from '../types/CustomFieldsContextItem';
@@ -37,8 +34,8 @@ import { ParsedJqlQuery } from 'src/types/ParsedJqlQuery';
 import bulkOperationRuleEnforcer from 'src/extension/bulkOperationRuleEnforcer';
 import { BulkOperationMode } from 'src/types/BulkOperationMode';
 
-// This is the maximum number of issues that can be returned by the search API.
-export const maxIssueSearchResults = 100;
+// This is the maximum number of issues that can be returned by the Jira issue search API.
+const maxIssueSearchResultsPerPage = 100;
 
 class JiraDataModel {
 
@@ -164,22 +161,45 @@ class JiraDataModel {
     return result;
   }
 
-  public getIssueSearchInfoByJql = async (jql: string): Promise<IssueSearchInfo> => {
-    return await this.getIssueSearchInfoByAlteredJql(jql);
+  public getIssueSearchInfoByJql = async (jql: string, maxResults: number): Promise<IssueSearchInfo> => {
+    const maxResultsPerPage = Math.min(maxIssueSearchResultsPerPage, maxResults);
+    let combinedIssueSearchInfo: IssueSearchInfo = {
+      nextPageToken: '',
+      isLast: false,
+      issues: [],
+    }
+    let moreSearchesRequired = true;
+    while (moreSearchesRequired) {
+      const maxResultsForThisSearch = Math.min(maxResultsPerPage, maxResults - combinedIssueSearchInfo.issues.length);
+      const issueSearchInfo = await this.getIssueSearchInfoByAlteredJql(jql, combinedIssueSearchInfo.nextPageToken, maxResultsForThisSearch);
+      combinedIssueSearchInfo = {
+        nextPageToken: issueSearchInfo.nextPageToken,
+        isLast: issueSearchInfo.isLast,
+        issues: [...combinedIssueSearchInfo.issues, ...issueSearchInfo.issues],
+        names: issueSearchInfo.names,
+      };
+      if (issueSearchInfo.isLast) {
+        moreSearchesRequired = false;
+      } else {
+        // If the total number of issues is less than the max results, we can stop
+        if (combinedIssueSearchInfo.issues.length >= maxResults) {
+          moreSearchesRequired = false;
+        }
+      }
+    }
+    return combinedIssueSearchInfo;
   }
 
-  private getIssueSearchInfoByAlteredJql = async (jql: string): Promise<IssueSearchInfo> => {
-    const maxResults = maxIssueSearchResults;
+  private getIssueSearchInfoByAlteredJql = async (jql: string, nextPageToken: string, maxResults: number): Promise<IssueSearchInfo> => {
     // Note that the following limits the amount of fields to be returned for performance reasons, but
     // also could result in certain fields in the Issue type not being populated if these fields do 
     // not cover them all.
     const fields = 'summary,description,issuetype,project,subtasks,status';
     const expand = 'renderedFields';
-    // console.log(` * jql=${jql}`);
-    const paramsString = `jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&fields=${fields}&expand=${expand}`;
-    // console.log(` * paramsString = ${paramsString}`);
-    // console.log(` * url = /rest/api/3/search/jql?${paramsString}`);
+    const paramsString = `jql=${encodeURIComponent(jql)}&maxResults=${maxResults}&nextPageToken=${nextPageToken}&fields=${fields}&expand=${expand}`;
+    // console.log(`jiraDataModel.getIssueSearchInfoByAlteredJql: Issue search url = /rest/api/3/search/jql?${paramsString}`);
     const queryParams = new URLSearchParams(paramsString);
+    // https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-search/#api-rest-api-3-search-jql-get
     const response = await requestJira(`/rest/api/3/search/jql?${queryParams}`, {
       headers: {
         'Accept': 'application/json'
@@ -197,11 +217,9 @@ class JiraDataModel {
       const errorText = await response.text();
       console.error(`Failed to fetch issues search info: ${response.status}: ${errorText}`);
       const issueSearchInfo: IssueSearchInfo = {
-        maxResults: 0,
-        startAt: 0,
-        total: 0,
-        isLast: false,
-        issues: []
+        isLast: true,
+        issues: [],
+        nextPageToken: ''
       };
       return issueSearchInfo;
     }
@@ -337,25 +355,21 @@ class JiraDataModel {
     startAt: number = 0,
     maxResults: number = 100
   ): Promise<ProjectSearchInfo> => {
-    if (mockGetProjects) {
-      return await getMockProjectSearchInfo(query, maxResults);
-    } else {
-      const url = `/rest/api/3/project/search?query=${encodeURIComponent(query)}&startAt=${startAt}&maxResults=${maxResults}&expand=issueTypes`;
-      // console.log(`JiraDataModel.pageOfProjectSearchInfo: Fetching projects with URL: ${url}`);
-      const response = await requestJira(url, {
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      // console.log(`Response: ${response.status} ${response.statusText}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch projects: ${response.status} ${response.statusText}`);
+    const url = `/rest/api/3/project/search?query=${encodeURIComponent(query)}&startAt=${startAt}&maxResults=${maxResults}&expand=issueTypes`;
+    // console.log(`JiraDataModel.pageOfProjectSearchInfo: Fetching projects with URL: ${url}`);
+    const response = await requestJira(url, {
+      headers: {
+        'Accept': 'application/json'
       }
-      const projectSearchInfo = await response.json();
-      this.cacheProjects(projectSearchInfo.values);
-      // console.log(`Projects: ${JSON.stringify(projects, null, 2)}`);
-      return projectSearchInfo;
+    });
+    // console.log(`Response: ${response.status} ${response.statusText}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch projects: ${response.status} ${response.statusText}`);
     }
+    const projectSearchInfo = await response.json();
+    this.cacheProjects(projectSearchInfo.values);
+    // console.log(`Projects: ${JSON.stringify(projects, null, 2)}`);
+    return projectSearchInfo;
   }
 
   // https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-user-search/#api-rest-api-3-user-search-get
@@ -574,25 +588,21 @@ class JiraDataModel {
       startAt: number = 0,
       maxResults: number = 50
   ): Promise<PageResponse<ProjectsFieldConfigurationSchemeMapping>> => {
-    if (mockGetFieldConfigurationSchemesForProjects) {
-      return await getMockFieldConfigurationSchemesForProjects(projectIds, startAt, maxResults);
-    } else {
-      let projectQueryArgs = '';
-      let nextSeparator = '';
-      for (const projectId of projectIds) {
-        projectQueryArgs += `${nextSeparator}projectId=${projectId}`;
-        nextSeparator = '&';
-      }
-      const response = await requestJira(`/rest/api/3/fieldconfigurationscheme/project?${projectQueryArgs}&startAt=${startAt}&maxResults=${maxResults}`, {
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      // console.log(`Response: ${response.status} ${response.statusText}`);
-      const outcome = await response.json() as PageResponse<ProjectsFieldConfigurationSchemeMapping>;
-      console.log(`Project field configuration schemes: ${JSON.stringify(outcome, null, 2)}`);
-      return outcome;  
+    let projectQueryArgs = '';
+    let nextSeparator = '';
+    for (const projectId of projectIds) {
+      projectQueryArgs += `${nextSeparator}projectId=${projectId}`;
+      nextSeparator = '&';
     }
+    const response = await requestJira(`/rest/api/3/fieldconfigurationscheme/project?${projectQueryArgs}&startAt=${startAt}&maxResults=${maxResults}`, {
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    // console.log(`Response: ${response.status} ${response.statusText}`);
+    const outcome = await response.json() as PageResponse<ProjectsFieldConfigurationSchemeMapping>;
+    console.log(`Project field configuration schemes: ${JSON.stringify(outcome, null, 2)}`);
+    return outcome;  
   }
   
   public getAllFieldConfigurationItems = async (
@@ -619,19 +629,15 @@ class JiraDataModel {
     startAt: number = 0,
     maxResults: number = 50):
   Promise<PageResponse<FieldConfigurationItem>> => {
-    if (mockGetFieldConfigurationItems) {
-      return await getMockFieldConfigurationItems(fieldConfigurationId, startAt, maxResults);
-    } else {
-      const response = await requestJira(`/rest/api/3/fieldconfiguration/${fieldConfigurationId}/fields?startAt=${startAt}&maxResults=${maxResults}`, {
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      // console.log(`Response: ${response.status} ${response.statusText}`);
-      const outcome = await response.json();
-      console.log(`Field configuration items: ${JSON.stringify(outcome, null, 2)}`);
-      return outcome;
-    }
+    const response = await requestJira(`/rest/api/3/fieldconfiguration/${fieldConfigurationId}/fields?startAt=${startAt}&maxResults=${maxResults}`, {
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    // console.log(`Response: ${response.status} ${response.statusText}`);
+    const outcome = await response.json();
+    console.log(`Field configuration items: ${JSON.stringify(outcome, null, 2)}`);
+    return outcome;
   }
   
   public getAllCustomFieldContextProjectMappings = async (
