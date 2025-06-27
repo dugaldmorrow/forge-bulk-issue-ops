@@ -113,7 +113,9 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
     setAllRowData(rowData);
     let newMappingsCount = 0;
     let unmappedCount = 0;
-    for (const issue of issueSelectionStateRef.current.selectedIssues) {
+    const expandedIssues = subtaskMoveStrategy === 'move-subtasks-explicitly-with-parents' ?
+      await expandIssueArrayToIncludeSubtasks(issueSelectionStateRef.current.selectedIssues) : issueSelectionStateRef.current.selectedIssues;
+    for (const issue of expandedIssues) {
       const sourceProject = issue.fields.project;
       const sourceIssueType = issue.fields.issuetype;
       const existingTargetIssueTypeId = bulkIssueTypeMappingModel.getTargetIssueTypeId(sourceProject.id, sourceIssueType.id);
