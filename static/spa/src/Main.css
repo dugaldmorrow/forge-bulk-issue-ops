@@ -240,7 +240,7 @@ table.field-mapping-table {
 table.field-mapping-table > thead > tr > th,
 table.field-mapping-table > tbody > tr > td {
   padding-left: 0px;
-  padding-right: 0px;
+  padding-right: 4px;
 }
 
 table.field-edit-table {

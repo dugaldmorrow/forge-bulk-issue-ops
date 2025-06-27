@@ -18,7 +18,7 @@ import bulkIssueTypeMappingModel from 'src/model/bulkIssueTypeMappingModel';
 import { ObjectMapping } from 'src/types/ObjectMapping';
 import { mapToObjectMap } from 'src/model/util';
 import { formatIssueType } from 'src/controller/formatters';
-import { renderPanelMessage } from 'src/widget/PanelMessage';
+import { PanelMessage, renderPanelMessage } from 'src/widget/PanelMessage';
 import { textToAdf } from 'src/controller/textToAdf';
 import { bulkMoveShowRetainOption } from 'src/model/config';
 import { CompletionState } from 'src/types/CompletionState';
@@ -164,6 +164,8 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
     const fieldMetadata: FieldMetadata = fieldMappingInfo.fieldMetadata;
     if (fieldMetadata.schema.type === 'option' || fieldMetadata.schema.type === 'options') {
       return renderFieldValuesSelect;
+    } else if (fieldMetadata.schema.type === 'array') {
+      return renderArrayFieldValuesSelect;
     } else if (fieldMetadata.schema.type === 'number') {
       return renderNumberFieldEntryWidget;
     } else if (fieldMetadata.schema.type === 'string') {
@@ -173,6 +175,48 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
     } else {
       return undefined;
     }
+  }
+
+  const renderArrayFieldValuesSelect = (fieldId: string, targetIssueType: IssueType, fieldMappingInfo: FieldMappingInfo): JSX.Element => {
+    const fieldMetadata: FieldMetadata = fieldMappingInfo.fieldMetadata;
+    console.log(`renderArrayFieldValuesSelect: fieldMetadata = ${JSON.stringify(fieldMetadata, null, 2)}`);
+    const selectedDefaultFieldValue = targetProjectFieldsModel.getSelectedDefaultFieldValue(targetIssueType.id, fieldId);
+    console.log(`renderArrayFieldValuesSelect: selectedDefaultFieldValue = ${JSON.stringify(selectedDefaultFieldValue)}`);
+    const selectableCustomFieldOptions: CustomFieldOption[] = [];
+    let selectedCustomFieldOption: CustomFieldOption | undefined = undefined;
+    if (fieldMetadata.allowedValues && fieldMetadata.allowedValues.length) {
+      for (const allowedValue of fieldMetadata.allowedValues) {
+        if (allowedValue.name) {
+          const customFieldOption: CustomFieldOption = {
+            id: allowedValue.id,
+            name: allowedValue.name,
+          };
+          selectableCustomFieldOptions.push(customFieldOption);
+          // console.log(`renderArrayFieldValuesSelect: allowedValue = ${JSON.stringify(allowedValue)}`);
+          if (selectedDefaultFieldValue && selectedDefaultFieldValue.value.length && allowedValue.name && allowedValue.id === selectedDefaultFieldValue.value[0]) {
+            selectedCustomFieldOption = customFieldOption;
+          }
+        } else {
+          // console.log(`renderArrayFieldValuesSelect: Skipping allowed value without a value: ${JSON.stringify(allowedValue)}`);
+        }
+      }
+    }
+    return (
+      <FieldValuesSelect
+        label={undefined}
+        selectableCustomFieldOptions={selectableCustomFieldOptions}
+        selectedCustomFieldOption={selectedCustomFieldOption}
+        menuPortalTarget={document.body}
+        onSelect={async (selectedCustomFieldOption: CustomFieldOption): Promise<void> => {
+          const defaultValue: DefaultFieldValue = {
+            retain: false,
+            type: "raw",
+            value: [selectedCustomFieldOption.id]
+          };
+          await onSelectDefaultFieldValue(targetIssueType, fieldId, fieldMetadata, defaultValue);
+        }}
+      />
+    );
   }
 
   const renderFieldValuesSelect = (fieldId: string, targetIssueType: IssueType, fieldMappingInfo: FieldMappingInfo): JSX.Element => {
@@ -306,6 +350,17 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
     )
   }
 
+  const renderFieldClearingWarningMessage = () => {
+    return (
+      <div style={{marginBottom: '10px'}}>
+        <PanelMessage
+          className="info-banner"
+          message={`Note: Moving work items will result in fields being cleared where current values do not match destination field options.`}
+        />
+      </div>
+    );
+  }
+
   const renderFieldMappingsState = () => {
     const renderedRows: JSX.Element[] = [];
     // console.log(`FieldMappingPanel.renderFieldMappingsState: props.fieldMappingsState = ${JSON.stringify(props.fieldMappingsState, null, 2)}`);
@@ -355,7 +410,12 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
       </div>
     );
     if (renderedRows.length > 0) {
-      return renderedTable;
+      return (
+        <div>
+          {renderFieldClearingWarningMessage()}
+          {renderedTable}
+        </div>
+      );
     } else {
       return renderPanelMessage(`There are no fields that need default values to be set.`);      
     }
