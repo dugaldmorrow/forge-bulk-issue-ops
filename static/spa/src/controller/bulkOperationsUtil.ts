@@ -4,7 +4,7 @@ import { DataRetrievalResponseBuilder } from "../model/DataRetrievalResponseBuil
 import { Project } from "../types/Project";
 import { IssueTypeFieldMappings, ProjectFieldMappings } from "../types/ProjectFieldMappings";
 import { FieldMappingInfo } from "src/types/FieldMappingInfo";
-
+import { optionalFieldNamesToIncludeInMoves } from "src/extension/bulkOperationStaticRules";
 
 export const buildFieldMappingsForProject = async (
   targetProjectId: string,
@@ -49,10 +49,19 @@ export const buildFieldMappingsForProject = async (
           }
           issueTypeFieldMappings.fieldIdsToFieldMappingInfos.set(fieldId, fieldMappingInfo);
         } else {
-          // console.log(`buildFieldMappingsForProject: Skipping non-custom field: ${fieldName}`);
+          // console.log(`buildFieldMappingsForProject: Skipping non-custom field: ${field.name}`);
         }
       } else {
-        // console.log(`buildFieldMappingsForProject: Skipping optional field: ${fieldName}`);
+        if (optionalFieldNamesToIncludeInMoves.includes(field.name)) {
+          console.log(`buildFieldMappingsForProject: Adding optional field "${field.name}" as per configuration.`);
+          const fieldMappingInfo: FieldMappingInfo = {
+            fieldId: fieldId,
+            fieldMetadata: field,
+          }
+          issueTypeFieldMappings.fieldIdsToFieldMappingInfos.set(fieldId, fieldMappingInfo);
+        } else {
+          // console.log(`buildFieldMappingsForProject: Skipping optional field: ${field.name}`);
+        }
       }
     }
   }

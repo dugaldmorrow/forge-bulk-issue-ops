@@ -5,15 +5,13 @@ import { TargetMandatoryFields, FieldValue } from "../types/TargetMandatoryField
 import { FieldMetadata } from "src/types/FieldMetadata";
 import { DefaultFieldValue } from "src/types/DefaultFieldValue";
 import bulkIssueTypeMappingModel from "src/model/bulkIssueTypeMappingModel";
-import { subtaskMoveStrategy } from "src/extension/bulkOperationStaticRules";
+import { defaultRetainValueSetting, subtaskMoveStrategy } from "src/extension/bulkOperationStaticRules";
 import { expandIssueArrayToIncludeSubtasks } from "src/model/issueSelectionUtil";
 
 type FieldSettings = {
   defaultFieldValue?: DefaultFieldValue;
   retainFieldValue: boolean;
 }
-
-const defaultRetainValueSetting = true;
 
 class TargetProjectFieldsModel {
 
