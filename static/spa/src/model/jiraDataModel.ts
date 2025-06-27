@@ -312,13 +312,14 @@ class JiraDataModel {
       });      
       // console.log(`Response: ${response.status} ${response.statusText}`);
       const createIssueMetadata = await response.json() as CreateIssueMetadata;
-      if (createIssueMetadata.projects && createIssueMetadata.projects.length === 1) {
+      if (createIssueMetadata.projects && createIssueMetadata.projects.length > 0) {
+        if (createIssueMetadata.projects.length > 1) {
+          console.error(`Expected exactly one project in create issue metadata for projectId ${projectId}: ${JSON.stringify(createIssueMetadata)}`);
+        }
         const projectCreateIssueMetadata = createIssueMetadata.projects[0];
         this.projectIdsToProjectCreateIssueMetadata.set(projectId, projectCreateIssueMetadata);
         // console.log(`Project createIssueMetadata: ${JSON.stringify(projectCreateIssueMetadata, null, 2)}`);
         return projectCreateIssueMetadata;
-      } else {
-        throw new Error(`Expected exactly one project in create issue metadata for projectId ${projectId}: ${JSON.stringify(createIssueMetadata)}`, );
       }
     }
   }

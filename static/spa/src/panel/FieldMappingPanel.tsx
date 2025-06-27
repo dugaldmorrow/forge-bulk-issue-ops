@@ -26,7 +26,7 @@ import { subtaskMoveStrategy } from 'src/extension/bulkOperationStaticRules';
 import { expandIssueArrayToIncludeSubtasks } from 'src/model/issueSelectionUtil';
 
 const showDebug = false;
-const showUnsupportedFields = false;
+const showUnsupportedFields = false; // KNOWN-8: Set this to true to help identify unsupported field types in bulk move operations.
 
 export type FieldMappingsState = {
   dataRetrieved: boolean;
