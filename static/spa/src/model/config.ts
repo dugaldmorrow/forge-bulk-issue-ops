@@ -6,6 +6,8 @@ export const requireFieldEditErrorAcknowledgement = false;
 
 export const taskStatusPollPeriodMillis = 1000;
 
+export const bulkEditEnabled = true;
+export const bulkMoveEnabled = true;
 export const bulkImportEnabled = true;
 
 export const bulkMoveShowRetainOption = false;

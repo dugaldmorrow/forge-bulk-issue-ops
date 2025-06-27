@@ -5,7 +5,7 @@ import BulkOperationPanel from "./panel/BulkOperationPanel";
 import importModel from "./model/importModel";
 import moveModel from "./model/moveModel";
 import editModel from "./model/editModel";
-import { bulkImportEnabled } from "./model/config";
+import { bulkEditEnabled, bulkImportEnabled, bulkMoveEnabled } from "./model/config";
 import { BulkOperationMode } from "./types/BulkOperationMode";
 import { BulkOpsModel } from "./model/BulkOpsModel";
 import './Main.css';
@@ -36,8 +36,8 @@ const Home = (props: HomeProps) => {
       <div>
         <h1>Bulk Work Item Operations</h1>
         <div className="bulk-move-main-panel clickable">
-          {renderMainPanel('move', 'Bulk Move Work Items', `Use this functionality to move a large number of work items from one or more projects to another project.`)}
-          {renderMainPanel('edit', 'Bulk Edit Work Items', `Use this functionality to edit a large number of work items in a similar way to each other.`)}
+          {bulkMoveEnabled ? renderMainPanel('move', 'Bulk Move Work Items', `Use this functionality to move a large number of work items from one or more projects to another project.`) : null}
+          {bulkEditEnabled ? renderMainPanel('edit', 'Bulk Edit Work Items', `Use this functionality to edit a large number of work items in a similar way to each other.`) : null }
           {bulkImportEnabled ? renderMainPanel('import', 'Bulk Import Work Items', `Using this functionality to import a large number of work items.`) : null }
         </div>
       </div>
@@ -114,8 +114,8 @@ const Main = () => {
         >
           <Routes>
             <Route path="/" element={<Home history={history} />}></Route>
-            {renderBulkOperationRoute('/move', 'Move', moveModel)}
-            {renderBulkOperationRoute('/edit', 'Edit', editModel)}
+            {renderBulkOperationRoute('/move', 'Move', moveModel, bulkMoveEnabled)}
+            {renderBulkOperationRoute('/edit', 'Edit', editModel, bulkEditEnabled)}
             {renderBulkOperationRoute('/import', 'Import', importModel, bulkImportEnabled)}
           </Routes>
         </Router>
