@@ -53,7 +53,8 @@ export const buildFieldMappingsForProject = async (
         }
       } else {
         if (optionalFieldNamesToIncludeInMoves.includes(field.name)) {
-          console.log(`buildFieldMappingsForProject: Adding optional field "${field.name}" as per configuration.`);
+          // console.log(`buildFieldMappingsForProject: Adding optional field "${field.name}" as per configuration.`);
+          // console.log(` * field = ${JSON.stringify(field, null, 2)}`);
           const fieldMappingInfo: FieldMappingInfo = {
             fieldId: fieldId,
             fieldMetadata: field,

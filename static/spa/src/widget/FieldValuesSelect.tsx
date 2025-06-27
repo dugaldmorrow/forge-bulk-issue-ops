@@ -10,6 +10,8 @@ import { CustomFieldOption } from 'src/types/CustomFieldOption';
 
 export type FieldValuesSelectProps = {
   label: string;
+  isRequired?: boolean;
+  noOptionsMessage?: string;
   selectableCustomFieldOptions: CustomFieldOption[];
   selectedCustomFieldOption?: CustomFieldOption;
   menuPortalTarget?: HTMLElement;
@@ -57,9 +59,12 @@ const FieldValuesSelect = (props: FieldValuesSelectProps) => {
         key={`field-options-select`}
         inputId="radio-select-example"
         testId="react-select"
+        isRequired={props.isRequired}
+        // noOptionsMessage={props.noOptionsMessage}
+        noOptionsMessage={({inputValue}) => !inputValue ? props.noOptionsMessage : "No results found"} 
         defaultValue={defaultValue}
         options={options}
-        placeholder={props.label}
+        placeholder={props.isRequired ? "Required field" : "Optional field"}
         menuPortalTarget={props.menuPortalTarget}
         onChange={onSingleSelectChange}
       />
