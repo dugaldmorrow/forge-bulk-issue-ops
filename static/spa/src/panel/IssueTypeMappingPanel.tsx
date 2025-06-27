@@ -10,7 +10,8 @@ import { formatIssueType, formatProject } from 'src/controller/formatters';
 import { BulkOperationMode } from 'src/types/BulkOperationMode';
 import { equalIssueSelections, expandIssueArrayToIncludeSubtasks, selectionToString } from 'src/model/issueSelectionUtil';
 import { IssueSelectionState } from 'src/types/IssueSelectionState';
-import { restrictIssueTypeMoveMappingsToSameHierarchyLevel, subtaskMoveStrategy } from 'src/extension/bulkOperationStaticRules';
+import { allowedBulkMoveIssueTypeMappings, bulkMoveIssueTypeMappingStrategy, restrictIssueTypeMoveMappingsToSameHierarchyLevel, subtaskMoveStrategy } from 'src/extension/bulkOperationStaticRules';
+import { PanelMessage } from 'src/widget/PanelMessage';
 
 const showDebug = false;
 
@@ -35,6 +36,22 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
   const [clonedSourceToTargetIssueTypeIds, setClonedSourceToTargetIssueTypeIds] = useState<Map<string, string>>(
     bulkIssueTypeMappingModel.cloneSourceToTargetIssueTypeIds());
   const issueSelectionStateRef = useRef<IssueSelectionState>(props.issueSelectionState);
+  const autoSelectIdRef = useRef<number>(0);
+
+  useEffect(() => {
+    onMount();
+    return () => {
+      onUnmount();
+    };
+  }, []);
+
+  useEffect(() => {
+    onTargetProjectTypeChanged(props.targetProject);
+  }, [props.targetProject]);
+
+  useEffect(() => {
+    autoSelectMatchingTargetIssueTypes();
+  }, [targetProjectIssueTypes, props.issueSelectionState.uuid]);
 
   const onMount = async (): Promise<void> => {
     setClonedSourceToTargetIssueTypeIds(bulkIssueTypeMappingModel.cloneSourceToTargetIssueTypeIds());
@@ -45,6 +62,11 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
 
   const onUnmount = (): void => {
     // bulkIssueTypeMapping.unregisterListener(onBulkIssueTypeMappingChange);
+  }
+
+  const onTargetProjectTypeChanged = async (targetProject: Project): Promise<void> => {
+    await loadTargetProjectIssueTypes();
+    await autoSelectMatchingTargetIssueTypes();
   }
 
   const buildAllRowData = async (issues: Issue[]): Promise<RowData[]> => {
@@ -69,6 +91,11 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
   }
 
   const autoSelectMatchingTargetIssueTypes = async (): Promise<void> => {
+    autoSelectIdRef.current++;
+    const myAutoSelectId = autoSelectIdRef.current;
+
+    setClonedSourceToTargetIssueTypeIds(new Map<string, string>());
+
     issueSelectionStateRef.current = props.issueSelectionState;
     if (!props.targetProject) {
       // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: skipping auto selection since target project is not defined.`);
@@ -78,6 +105,11 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
     const originalMappingCount = bulkIssueTypeMappingModel.getMappingsCount();
     // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: Auto selecting matching target issue types for ${props.selectedIssues.length} selected issues.`);
     const rowData = await buildAllRowData(issueSelectionStateRef.current.selectedIssues);
+    if (autoSelectIdRef.current !== myAutoSelectId) {
+      // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: Skipping auto selection since the autoSelectId has changed from ${myAutoSelectId} to ${autoSelectIdRef.current}.`);
+      return;
+    }
+    // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: Auto selection is still current.`);
     setAllRowData(rowData);
     let newMappingsCount = 0;
     let unmappedCount = 0;
@@ -93,8 +125,15 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
         const matchingTargetIssueType = targetProjectIssueTypes.find(issueType => issueType.name === sourceIssueType.name);
         if (matchingTargetIssueType) {
           // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: Auto selecting target issue type: ${matchingTargetIssueType.name} (${matchingTargetIssueType.name}) for source project: ${sourceProject.key}, source issue type: ${sourceIssueType.name}`);
-          bulkIssueTypeMappingModel.addMapping(sourceProject.id, sourceIssueType.id, matchingTargetIssueType.id);
-          newMappingsCount++;``
+
+          const mappingAllowed = isMappingAllowed(sourceProject.id, sourceIssueType.id, matchingTargetIssueType.id);
+
+          if (mappingAllowed) {
+            bulkIssueTypeMappingModel.addMapping(sourceProject.id, sourceIssueType.id, matchingTargetIssueType.id);
+            newMappingsCount++;``
+          } else {
+            // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: Mapping not allowed for source project: ${sourceProject.key}, source issue type: ${sourceIssueType.name} (${sourceIssueType.id}) - target issue type: ${matchingTargetIssueType.name} (${matchingTargetIssueType.id}).`);
+          }
         } else {
           unmappedCount++;
           // console.log(`IssueTypeMappingPanel.autoSelectMatchingTargetIssueTypes: No matching target issue type found for source project: ${sourceProject.id}, source issue type: ${sourceIssueType.id}.`);
@@ -123,10 +162,6 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
     }, notificationDelay);
   }
 
-  useEffect(() => {
-    autoSelectMatchingTargetIssueTypes();
-  }, [props.targetProject, targetProjectIssueTypes, props.issueSelectionState.uuid]);
-
   const getTargetIssueTypeId = (sourceProjectId: string, sourceIssueTypeId: string): string | undefined => {
     const key = buildKey(sourceProjectId, sourceIssueTypeId);
     return clonedSourceToTargetIssueTypeIds.get(key);
@@ -144,6 +179,9 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
     setClonedSourceToTargetIssueTypeIds(clonedSourceToTargetIssueTypeIds);
     const newMappingCount =  bulkIssueTypeMappingModel.getMappingsCount();
     props.onIssueTypeMappingChange(props.issueSelectionState, originalMappingCount, newMappingCount);
+    // setTimeout(async () => {
+    //   props.onIssueTypeMappingChange(props.issueSelectionState, originalMappingCount, newMappingCount);
+    // }, 1000);
   }
 
   const determineInitiallySelectedOption = (
@@ -155,34 +193,76 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
     const targetIssueTypeId = getTargetIssueTypeId(sourceProjectId, sourceIssueTypeId);
     const option = options.find((option: Option) => option.value === targetIssueTypeId);
     // console.log(` * initially selected option: ${option ? option.label : 'none'}`);
-    return option;
+    return option && !option.isDisabled ? option : undefined;
+  }
+
+  const isMappingAllowed = (sourceProjectId: string, sourceIssueTypeId: string, targetIssueTypeId: string): boolean => {
+    const sourceIssueType = props.allIssueTypes.find(issueType => issueType.id === sourceIssueTypeId);
+    const targetIssueType = props.allIssueTypes.find(issueType => issueType.id === targetIssueTypeId);
+    let allowed = false;
+    if (sourceIssueType && targetIssueType) {
+      allowed = !restrictIssueTypeMoveMappingsToSameHierarchyLevel || targetIssueType.hierarchyLevel === sourceIssueType.hierarchyLevel;
+      if (bulkMoveIssueTypeMappingStrategy === 'exact-matches-and-allow-listed-mappings' || bulkMoveIssueTypeMappingStrategy === 'only-allow-listed-mappings') {
+        if (bulkMoveIssueTypeMappingStrategy === 'exact-matches-and-allow-listed-mappings' && sourceIssueType.name === targetIssueType.name) {
+          allowed = true;
+        } else {
+          const mappingKeys = Object.keys(allowedBulkMoveIssueTypeMappings);
+          if (sourceIssueType && mappingKeys.includes(sourceIssueType.name) && allowedBulkMoveIssueTypeMappings[sourceIssueType.name] === targetIssueType.name) {
+            allowed = true;
+          } else {
+            allowed = false;
+          }
+        }
+      }
+    } else {
+      console.warn(`IssueTypeMappingPanel.isMappingAllowed: Mapping not allowed for source project: ${sourceProjectId}, source issue type: ${sourceIssueTypeId} (${sourceIssueType ? sourceIssueType.name : 'unknown'}) - target issue type: ${targetIssueTypeId} (${targetIssueType ? targetIssueType.name : 'unknown'}).`);
+    }
+    return allowed;    
+  }
+
+  const isIssueTypeSelectable = (sourceIssueType: IssueType | undefined, targetIssueType: IssueType): boolean => {
+    let isIssueTypeSelectable = !restrictIssueTypeMoveMappingsToSameHierarchyLevel || (sourceIssueType && targetIssueType.hierarchyLevel === sourceIssueType.hierarchyLevel);
+    if (bulkMoveIssueTypeMappingStrategy === 'exact-matches-and-allow-listed-mappings' || bulkMoveIssueTypeMappingStrategy === 'only-allow-listed-mappings') {
+      if (bulkMoveIssueTypeMappingStrategy === 'exact-matches-and-allow-listed-mappings' && sourceIssueType.name === targetIssueType.name) {
+        isIssueTypeSelectable = true;
+      } else {
+        const mappingKeys = Object.keys(allowedBulkMoveIssueTypeMappings);
+        if (sourceIssueType && mappingKeys.includes(sourceIssueType.name) && allowedBulkMoveIssueTypeMappings[sourceIssueType.name] === targetIssueType.name) {
+          isIssueTypeSelectable = true;
+        } else {
+          isIssueTypeSelectable = false;
+        }
+      }
+    }
+    return isIssueTypeSelectable;
   }
 
   const renderTargetProjectIssueTypeSelect = (sourceProjectId: string, sourceIssueTypeId: string) => {
     const options: Option[] = [];
     const sourceIssueType = props.allIssueTypes.find(issueType => issueType.id === sourceIssueTypeId);
     const filteredIssueTypes = props.filterIssueTypes(targetProjectIssueTypes, props.targetProject, props.bulkOperationMode);
-    for (const issueType of filteredIssueTypes) {
-      const addOption = !restrictIssueTypeMoveMappingsToSameHierarchyLevel || (sourceIssueType && issueType.hierarchyLevel === sourceIssueType.hierarchyLevel);
-      if (addOption) {
-        // If the target issue type is a parent of the source issue type, select it by default
-        const option: Option = {
-          label: `${formatIssueType(issueType)}`,
-          value: issueType.id,
-        };
-        options.push(option);
-      }
+    for (const targetIssueType of filteredIssueTypes) {
+      const optionSelectable = isIssueTypeSelectable(sourceIssueType, targetIssueType);
+      const option: Option = {
+        label: `${formatIssueType(targetIssueType)}`,
+        value: targetIssueType.id,
+        isDisabled: !optionSelectable
+      };
+      options.push(option);
     }
     const defaultValue = determineInitiallySelectedOption(sourceProjectId, sourceIssueTypeId, options);
     // console.log(`renderTargetProjectIssueTypeSelect: defaultValue for source project ${sourceProjectId}, source issue type ${sourceIssueTypeId} is "${defaultValue ? defaultValue.label : 'none'}" (${defaultValue ? defaultValue.value : 'none'})`);
     return (
       <div>
         <Select
+          key={`target-issue-type-select-${props.targetProject ? props.targetProject.id : 'none'}-${defaultValue ? defaultValue.value : 'none'}`}
           inputId="target-issue-type-select"
           isMulti={false}
           isRequired={true}
+          // isDisabled={bulkMoveIssueTypeMappingStrategy === 'only-allow-listed-mappings'}
           options={options}
           value={defaultValue}
+          // defaultValue={defaultValue}
           placeholder="Select issue type"
           menuPortalTarget={document.body}
           onChange={(option: Option) => {
@@ -217,21 +297,11 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
   //   setClonedSourceToTargetIssueTypeIds(cloneSourceToTargetIssueTypeIds());
   // }
  
-  useEffect(() => {
-    onMount();
-    return () => {
-      onUnmount();
-    };
-  }, []);
-
-
-  useEffect(() => {
-    loadTargetProjectIssueTypes();
-  }, [props.targetProject]);
-
   const renderMappings = () => {
     return (
-      <div className="data-table-container">
+      <div
+        key={`mapping-panel-${props.targetProject ? props.targetProject.id : 'none'}`}
+        className="data-table-container">
         <table className="data-table">
           <thead>
             <tr>
@@ -256,9 +326,36 @@ const IssueTypeMappingPanel = (props: IssueTypeMappingPanelProps) => {
     );
   }
 
+  const renderChangeIssueTypesMessage = () => {
+    if (bulkMoveIssueTypeMappingStrategy === 'all-mappings-at-same-level-allowed') {
+      return null;
+    } else {
+      const mappingKeys = Object.keys(allowedBulkMoveIssueTypeMappings);
+      let message = '';
+      if (mappingKeys.length === 0) {
+        message = 'No work item type mappings are allowed for this operation.';          
+      } else {
+        message = `Only ${bulkMoveIssueTypeMappingStrategy === 'exact-matches-and-allow-listed-mappings' ? 'exact matches and ' : ''}the following work item type mappings are allowed;- ${mappingKeys.map(mappingKey => `${mappingKey} → ${allowedBulkMoveIssueTypeMappings[mappingKey]}`).join(', ')}`;
+      }
+      return (
+        <div style={{marginBottom: '10px'}}>
+          <PanelMessage
+            className="info-banner"
+            message={`Note: ${message}`}
+          />
+        </div>
+      );
+    }
+  }
+
   const renderPanel = () => {
     if (props.targetProject && props.issueSelectionState.selectedIssues.length > 0) {
-      return renderMappings();
+      return (
+        <div>
+          {renderChangeIssueTypesMessage()}
+          {renderMappings()}
+        </div>
+      );
     } else {
       return null;
       // return renderPanelMessage('Waiting for previous steps to be completed.');

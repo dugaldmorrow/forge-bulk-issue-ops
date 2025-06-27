@@ -13,6 +13,23 @@ export const allowBulkEditsFromMultipleProjects = false;
 
 export const allowBulkEditsAcrossMultipleProjects = true;
 
+export const bulkMoveIssueTypeMappingStrategy: BulkMoveIssueTypeMappingStrategy = 'exact-matches-and-allow-listed-mappings'; 
+export type BulkMoveIssueTypeMappingStrategy =
+  'all-mappings-at-same-level-allowed' | // Any issue type can be mapped to any other of the same hierarchy level
+  'exact-matches-and-allow-listed-mappings' |
+  'only-allow-listed-mappings'; // When active, the allow list is defined by allowedBulkMoveIssueTypeMappings
+
+/**
+ * This is a mapping of source issue types to target issue types for bulk move operations.
+ */
+export const allowedBulkMoveIssueTypeMappings = {
+  // The following are just examples that have been used for testing. Change these mappings as needed.
+  // 'Story': 'Story',
+  // 'Story': 'Task',
+  'Bug': 'THE Bug'
+};
+
+
 /**
  * If this is false, bulk moves and edits will not be allowed for issues that are already resolved. This
  * effectively inserts `statusCategory != Done and ` before the JQL query used to find issues for bulk operations.

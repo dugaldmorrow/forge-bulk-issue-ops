@@ -44,6 +44,7 @@ import { FilterPanel } from './FilterPanel';
 import { IssueSelectionState } from 'src/types/IssueSelectionState';
 import { IssueSelectionValidity } from 'src/types/IssueSelectionValidity';
 import { equalIssueSelections, newIssueSelectionUuid, selectionToString } from 'src/model/issueSelectionUtil';
+import { applyDebouncingDelay } from 'src/model/util';
 
 const showDebug = false;
 const showCompletionStateDebug = false;
@@ -63,6 +64,7 @@ type DebugInfo = {
 const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
 
   const [stepNamesToCompletionStates, setStepNamesToCompletionStates] = useState<ObjectMapping<CompletionState>>({});
+  const stepNamesToCompletionStatesRef = useRef<ObjectMapping<CompletionState>>(stepNamesToCompletionStates);
   const [modelUpdateTimestamp, setLastModelUpdateTime] = useState<number>(0);
   const [stepSequence, setStepSequence] = useState<StepName[]>([])
   const [bulkOperationMode, setBulkOperationMode] = useState<BulkOperationMode>(props.bulkOperationMode);
@@ -99,10 +101,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     const stepName = completionStateChangeInfo.stepName;
     const completionState = completionStateChangeInfo.completionState;
     console.log(`BulkOperationPanel.onImportModelStepCompletionStateChange: step "${stepName}" is now "${completionState}"`);
-    setStepNamesToCompletionStates(prevState => ({
-      ...prevState,
-      [stepName]: completionState
-    }));
+    updateStepCompletionState(stepName, completionState);
   }
 
   const onModelUpdateChange = (modelUpdateTimestamp: number) => {
@@ -140,30 +139,41 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     setStepSequence(stepSequence);
   }
 
-  const setStepCompletionState = (stepName: StepName, completionState: CompletionState) => {
-    setStepNamesToCompletionStates(prevState => ({
-      ...prevState,
-      [stepName]: completionState
-    }));
+  const cloneStepNamesToCompletionStates = (): ObjectMapping<CompletionState> => {
+    // console.log(`BulkOperationPanel.cloneStepNamesToCompletionStates: Cloning step names to completion states...`);
+    const clonedStates: ObjectMapping<CompletionState> = {};
+    for (const stepName of stepSequence) {
+      clonedStates[stepName] = stepNamesToCompletionStatesRef.current[stepName];
+    }
+    return clonedStates;
+  }
+
+  const updateStepCompletionState = (stepName: StepName, completionState: CompletionState): void => {
+    // console.log(`BulkOperationPanel.updateStepCompletionState: Setting step "${stepName}" state to "${completionState}"....`);
+    const newStepNamesToCompletionStates = cloneStepNamesToCompletionStates();
+    newStepNamesToCompletionStates[stepName] = completionState;
+    setStepNamesToCompletionStates(newStepNamesToCompletionStates);
+    stepNamesToCompletionStatesRef.current = newStepNamesToCompletionStates;
   }
 
   const onEditsValidityChange = (valid: boolean) => {
-    setStepCompletionState('edit-fields', valid ? 'complete' : 'incomplete');
+    updateStepCompletionState('edit-fields', valid ? 'complete' : 'incomplete');
   }
 
   const getStepCompletionState = (stepName: StepName): CompletionState => {
     return stepNamesToCompletionStates[stepName];
   }
 
-  const arePrerequisiteStepsComplete = (priorToStepName: StepName): boolean => {
+  const arePrerequisiteStepsComplete = (priorToStepName: StepName, rendering: boolean): boolean => {
     let complete = true;
     for (const stepName of stepSequence) {
       if (stepName === priorToStepName) {
         break; // Stop checking once we reach the step we're interested in
       }
-      const completionState = stepNamesToCompletionStates[stepName];
+      const completionState = rendering ? stepNamesToCompletionStates[stepName] : stepNamesToCompletionStatesRef.current[stepName];
       if (isStepApplicableToBulkOperationMode(stepName)) {
         if (completionState !== 'complete') {
+          // console.log(`BulkOperationPanel.arePrerequisiteStepsComplete: Step "${stepName}" is not complete.`);
           complete = false;
           break;
         }
@@ -177,8 +187,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       const completionState = stepNamesToCompletionStates[stepName];
       return (
         <li key={stepName}>
-          {`${stepName}: `} 
-          {isStepApplicableToBulkOperationMode(stepName) ? completionState === 'complete' ? 'COMPLETE' : 'INCOMPLETE' : 'N/A'}
+          {`${stepName}: ${stepNamesToCompletionStates[stepName]} / ${stepNamesToCompletionStatesRef.current[stepName]}`}
         </li>
       );
     });
@@ -197,8 +206,14 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const isFieldMappingsComplete = () => {
-    const allFieldValuesSet = targetProjectFieldsModel.areAllFieldValuesSet();
-    return fieldMappingsState.current.dataRetrieved && allFieldValuesSet;
+    const allPreviousStepsComplete = arePrerequisiteStepsComplete('field-mapping', false);
+    if (allPreviousStepsComplete) {
+      const allFieldValuesSet = targetProjectFieldsModel.areAllFieldValuesSet();
+      return fieldMappingsState.current.dataRetrieved && allFieldValuesSet;
+    } else {
+      // console.log(`BulkOperationPanel.isFieldMappingsComplete: Previous steps are not complete, so field mappings cannot be complete.`);
+      return false;
+    }
   }
 
   const retrieveAndSetDebugInfo = async (): Promise<void> => {
@@ -299,14 +314,15 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     setIssueSearchInfoTime(Date.now());
     setLastDataLoadTime(Date.now());
     clearFieldMappingsState();
-    setStepCompletionState('issue-selection', newIssueSelectionState.selectionValidity === 'valid' ? 'complete' : 'incomplete');
+    const newState = updateStepCompletionState('issue-selection', newIssueSelectionState.selectionValidity === 'valid' ? 'complete' : 'incomplete');
     updateMappingsCompletionStates();
   }
 
   const updateMappingsCompletionStates = (): void => {
     const fieldMappingsComplete = isFieldMappingsComplete();
+    // console.log(`BulkOperationPanel.updateMappingsCompletionStates: fieldMappingsComplete = ${fieldMappingsComplete}`);
     setFieldMappingsComplete(fieldMappingsComplete);
-    setStepCompletionState('field-mapping', fieldMappingsComplete ? 'complete' : 'incomplete');
+    updateStepCompletionState('field-mapping', fieldMappingsComplete ? 'complete' : 'incomplete');
   }
 
   const onIssuesSelectionChange = async (newIssueSelectionState: IssueSelectionState): Promise<void> => {
@@ -316,7 +332,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     await targetProjectFieldsModel.setSelectedIssues(newIssueSelectionState.selectedIssues, allIssueTypes);
     // Clear downstream state...
     clearStepStateAfter('issue-selection');
-    setStepCompletionState('issue-selection', newIssueSelectionState.selectionValidity === 'valid' ? 'complete' : 'incomplete');
+    updateStepCompletionState('issue-selection', newIssueSelectionState.selectionValidity === 'valid' ? 'complete' : 'incomplete');
   }
 
   // This routine clears the state of the current step and downstream steps. However, the import 
@@ -336,8 +352,8 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       setSelectedToProjectTime(Date.now());
     } else if (stepName === 'issue-type-mapping') {
       bulkIssueTypeMappingModel.clearMappings();
-      fieldMappingsState.current.projectFieldMappings.targetIssueTypeIdsToMappings.clear();
     } else if (stepName === 'edit-fields') {
+      fieldMappingsState.current.projectFieldMappings.targetIssueTypeIdsToMappings.clear();
       // No need to clear edited fields as this would be annoying for the user.
       stateShouldBecomeIncomplete = false;
     } else if (stepName === 'field-mapping') {
@@ -356,7 +372,8 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       console.warn(`BulkOperationPanel.clearStepState: No action defined for step "${stepName}".`);
     }
     if (stateShouldBecomeIncomplete) {
-      setStepCompletionState(stepName, 'incomplete');
+      // console.log(`BulkOperationPanel.clearStepState: Setting step "${stepName}" to "incomplete".`);
+      updateStepCompletionState(stepName, 'incomplete');
     }
     clearStepStateAfter(stepName);
   }
@@ -369,7 +386,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const onIssueSearchInitiated = async (): Promise<void> => {
-    setStepCompletionState('filter', 'incomplete');
+    updateStepCompletionState('filter', 'incomplete');
     // Clear downstream state...
     clearStepStateAfter('filter');
   }
@@ -384,15 +401,17 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       await onIssuesLoaded(true, issueSearchInfo);
     }
     const issueCount = issueSearchInfo.issues.length;
-    setStepCompletionState('filter', issueCount > 0 ? 'complete' : 'incomplete');
+    updateStepCompletionState('filter', issueCount > 0 ? 'complete' : 'incomplete');
     setIssueLoadingState('idle');
   }
-  
+
   const updateFieldMappingState = async (selectedargetProject: Project) => {
-    updateFieldMappingsIfNeeded(selectedargetProject);
+    await updateFieldMappingsIfNeeded(selectedargetProject);
     await targetProjectFieldsModel.setSelectedIssues(issueSelectionState.selectedIssues, allIssueTypes);
-    setStepCompletionState('field-mapping', isFieldMappingsComplete() ? 'complete' : 'incomplete');
-    setStepCompletionState('target-project-selection', selectedargetProject ? 'complete' : 'incomplete');
+    const fieldMappingComplete = isFieldMappingsComplete();
+    // console.log(`BulkOperationPanel.updateFieldMappingState: fieldMappingComplete = ${fieldMappingComplete}`);
+    // setStepCompletionState('field-mapping', fieldMappingComplete ? 'complete' : 'incomplete');
+    // setStepCompletionState('target-project-selection', selectedargetProject ? 'complete' : 'incomplete');
     updateMappingsCompletionStates();
   }
 
@@ -402,6 +421,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     setSelectedToProjectTime(Date.now());
     // Clear downstream state...
     clearStepStateAfter('target-project-selection');
+    updateStepCompletionState('target-project-selection', selectedProject ? 'complete' : 'incomplete');
     // Automatically update field mappings if possible
     await updateFieldMappingState(selectedProject);
   }
@@ -442,6 +462,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     const newFieldMappingsState = await buildFieldMappingsState(selectedToProject);
     fieldMappingsState.current = newFieldMappingsState;
     targetProjectFieldsModel.setProjectFieldMappings(newFieldMappingsState.projectFieldMappings);
+    // console.log(`BulkOperationPanel.onInitiateFieldValueMapping: newFieldMappingsState.projectFieldMappings.targetIssueTypeIdsToMappings.size = `, newFieldMappingsState.projectFieldMappings.targetIssueTypeIdsToMappings.size);
   }
 
   const updateFieldMappingsIfNeeded = async (selectedToProject: undefined | Project): Promise<void> => {
@@ -455,7 +476,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const onAllDefaultValuesProvided = async (allDefaultValuesProvided: boolean): Promise<void> => {
-    // console.log(`BulkOperationPanel: onAllDefaultValuesProvided: ${allDefaultValuesProvided}`);
+    // console.log(`BulkOperationPanel.onAllDefaultValuesProvided: ${allDefaultValuesProvided}`);
     setAllDefaultValuesProvided(allDefaultValuesProvided);
     await updateFieldMappingState(selectedToProject);
   }
@@ -467,13 +488,11 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   ): Promise<void> => {
     if (equalIssueSelections(thisIssueSelectionState, issueSelectionState)) {
       // console.log(`BulkOperationPanel.onIssueTypeMappingChange: Received onIssueTypeMappingChange with the current issue selection state.`);
-      // const allIssuesAreMapped = bulkIssueTypeMappingModel.areAllIssueTypesMapped(issueSelectionState.selectedIssues);
-      // console.log(`BulkOperationPanel.onIssueTypeMappingChange:\n * originalMappingCount = ${originalMappingCount};\n * newMappingCount = ${newMappingCount};\n * allIssuesAreMapped = ${allIssuesAreMapped};\n * selectedIssues = ${issueSelectionState.selectedIssues.map(issue => issue.key).join(', ')};`);
       await targetProjectFieldsModel.setSelectedIssues(issueSelectionState.selectedIssues, allIssueTypes);
-      const allIssueTypesMapped = bulkIssueTypeMappingModel.areAllIssueTypesMapped(issueSelectionState.selectedIssues);
-      setAllIssueTypesMapped(allIssueTypesMapped);
-      const issueTypeMappingCompletionState = issueSelectionState.selectionValidity === 'valid' && allIssueTypesMapped ? 'complete' : 'incomplete';
-      setStepCompletionState('issue-type-mapping', issueTypeMappingCompletionState);
+      const allIssuesAreMapped = bulkIssueTypeMappingModel.areAllIssueTypesMapped(issueSelectionState.selectedIssues);
+      setAllIssueTypesMapped(allIssuesAreMapped);
+      const issueTypeMappingCompletionState = issueSelectionState.selectionValidity === 'valid' && allIssuesAreMapped ? 'complete' : 'incomplete';
+      updateStepCompletionState('issue-type-mapping', issueTypeMappingCompletionState);
       await updateFieldMappingState(selectedToProject);
     } else {
       // console.log(`BulkOperationPanel.onIssueTypeMappingChange: Received onIssueTypeMappingChange with a stale issue selection state.`);
@@ -625,7 +644,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   const renderIssuesPanel = (stepNumber: number) => {
     const hasIssues = issueSearchInfo.issues.length > 0;
     const waitingMessage = new WaitingMessageBuilder()
-      .addCheck(arePrerequisiteStepsComplete('issue-selection'), 'Waiting for previous step to be completed.')
+      .addCheck(arePrerequisiteStepsComplete('issue-selection', true), 'Waiting for previous step to be completed.')
       .build();
     let panelLabel = `Select work items to ${bulkOperationMode.toLowerCase()}`;
     return (
@@ -667,7 +686,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
 
   const renderTargetProjectPanel = (stepNumber: number) => {
     const waitingMessage = new WaitingMessageBuilder()
-      .addCheck(arePrerequisiteStepsComplete('target-project-selection'), 'Waiting for previous steps to be completed.')
+      .addCheck(arePrerequisiteStepsComplete('target-project-selection', true), 'Waiting for previous steps to be completed.')
       .addCheck(issueSelectionState.selectionValidity === 'valid', 'A valid set of work items has not yet been selected.')
       .build();
     return (
@@ -699,7 +718,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
 
   const renderIssueTypeMappingPanel = (stepNumber: number) => {
     const waitingMessage = new WaitingMessageBuilder()
-      .addCheck(arePrerequisiteStepsComplete('issue-type-mapping'), 'Waiting for previous steps to be completed.')
+      .addCheck(arePrerequisiteStepsComplete('issue-type-mapping', true), 'Waiting for previous steps to be completed.')
       .build();
     return (
       <div className="padding-panel">
@@ -728,16 +747,18 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
 
   const renderFieldValueMappingsPanel = (stepNumber: number) => {
     const waitingMessage = new WaitingMessageBuilder()
-      .addCheck(arePrerequisiteStepsComplete('field-mapping'), 'Waiting for previous steps to be completed.')
+      .addCheck(arePrerequisiteStepsComplete('field-mapping', true), 'Waiting for previous steps to be completed.')
       .build();
     const issueTypeMappingStepCompletionState = getStepCompletionState('issue-type-mapping');
+    const fieldMappingCompletionState = getStepCompletionState('field-mapping');
     return (
       <div className="padding-panel">
         <div className="content-panel">
           <PanelHeader
+            key={`field-mapping-panel-${selectedToProjectTime}-${fieldMappingCompletionState}`}
             stepNumber={stepNumber}
-            label="Map work item field values"
-            completionState={getStepCompletionState('field-mapping')}
+            label={`Map work item field values`}
+            completionState={fieldMappingCompletionState}
           />
           {renderPanelMessage(waitingMessage, {marginTop: '20px', marginBottom: '20px'})}
           {renderStartFieldMappingButton()}
@@ -797,7 +818,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
             selectedToProject={selectedToProject}
             allDefaultValuesProvided={allDefaultValuesProvided}
             lastInputConditionsChangeTime={lastInputConditionsChangeTime}
-            onSetStepCompletionState={setStepCompletionState}
+            onSetStepCompletionState={updateStepCompletionState}
             onSetMainWarningMessage={setMainWarningMessage}
           />
         </div>

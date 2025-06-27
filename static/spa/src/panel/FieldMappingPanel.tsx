@@ -105,7 +105,7 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
     const targetIssueTypeIdsToTargetIssueTypesBeingMapped = await determineTargetIssueTypeIdsToTargetIssueTypesBeingMapped(
       props.issues, props.allIssueTypes);
     setTargetIssueTypeIdsToTargetIssueTypesBeingMapped(targetIssueTypeIdsToTargetIssueTypesBeingMapped);
-    console.log(`FieldMappingPanel.refreshTargetIssueTypeIdsToTargetIssueTypesBeingMapped: targetIssueTypeIdsToTargetIssueTypesBeingMapped = ${JSON.stringify(Array.from(targetIssueTypeIdsToTargetIssueTypesBeingMapped.entries()), null, 2)}`);
+    // console.log(`FieldMappingPanel.refreshTargetIssueTypeIdsToTargetIssueTypesBeingMapped: targetIssueTypeIdsToTargetIssueTypesBeingMapped = ${JSON.stringify(Array.from(targetIssueTypeIdsToTargetIssueTypesBeingMapped.entries()), null, 2)}`);
   }
 
   const loadFieldInfo = async (): Promise<void> => {
@@ -123,7 +123,9 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
   const refreshFromIssues = async (): Promise<void> => {
     await refreshTargetIssueTypeIdsToTargetIssueTypesBeingMapped();
     const allDefaultValuesProvided = targetProjectFieldsModel.areAllFieldValuesSet();
-    if (allDefaultValuesProvided !== lastNotfiedAllDefaultsProvidedValueRef.current) {
+    if (allDefaultValuesProvided === lastNotfiedAllDefaultsProvidedValueRef.current) {
+      // console.log(`FieldMappingPanel.refreshFromIssues: No change in all default values provided state, skipping notification.`);
+    } else {
       if (allDefaultValuesProvided) {
         // console.log(`FieldMappingPanel.refreshFromIssues: All default values are provided, notifying parent.`);
         setTimeout(async () => {
@@ -137,23 +139,20 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
   }
 
   const onSelectDefaultFieldValue = async (targetIssueType: IssueType, fieldId: string, fieldMetadata: FieldMetadata, defaultValue: DefaultFieldValue): Promise<void> => {
+    // console.log(`FieldMappingPanel.onSelectDefaultFieldValue: targetIssueType = ${targetIssueType.id}, fieldId = ${fieldId}, defaultValue = ${JSON.stringify(defaultValue)}`);
     targetProjectFieldsModel.onSelectDefaultValue(targetIssueType, fieldId, fieldMetadata, defaultValue);
     const allDefaultValuesProvided = targetProjectFieldsModel.areAllFieldValuesSet();
     setAllDefaultsProvided(allDefaultValuesProvided);
-    if (allDefaultValuesProvided !== lastNotfiedAllDefaultsProvidedValueRef.current) {
-      lastNotfiedAllDefaultsProvidedValueRef.current = allDefaultValuesProvided;
-      await props.onAllDefaultValuesProvided(allDefaultValuesProvided);
-    }
+    lastNotfiedAllDefaultsProvidedValueRef.current = allDefaultValuesProvided;
+    await props.onAllDefaultValuesProvided(allDefaultValuesProvided);
   }
 
   const onDeselectDefaultFieldValue = async (targetIssueType: IssueType, fieldId: string, fieldMetadata: FieldMetadata): Promise<void> => {
     targetProjectFieldsModel.onDeselectDefaultValue(targetIssueType, fieldId, fieldMetadata);
     const allDefaultValuesProvided = targetProjectFieldsModel.areAllFieldValuesSet();
     setAllDefaultsProvided(allDefaultValuesProvided);
-    if (allDefaultValuesProvided !== lastNotfiedAllDefaultsProvidedValueRef.current) {
-      lastNotfiedAllDefaultsProvidedValueRef.current = allDefaultValuesProvided;
-      await props.onAllDefaultValuesProvided(allDefaultValuesProvided);
-    }
+    lastNotfiedAllDefaultsProvidedValueRef.current = allDefaultValuesProvided;
+    await props.onAllDefaultValuesProvided(allDefaultValuesProvided);
   }
 
   const onRetainFieldValueSelection = (targetIssueType: IssueType, fieldId: string, fieldMetadata: FieldMetadata, retainFieldValue: boolean): void => {
@@ -237,7 +236,7 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
             await onDeselectDefaultFieldValue(targetIssueType, fieldId, fieldMetadata);
             return;
           } else {
-            console.log(`Setting default value for field ID ${fieldId} to ${fieldValue}`);
+            // console.log(`Setting default value for field ID ${fieldId} to ${fieldValue}`);
             const defaultValue: DefaultFieldValue = {
               retain: false,
               type: "raw",
@@ -262,7 +261,7 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
           const enteredText = event.currentTarget.value;
           // KNOWN-6: Rich text fields in bulk move operations only supports plain text where each new line is represented as a new paragraph.
           const adf = textToAdf(enteredText);
-          console.log(`Setting default value for field ID ${fieldId} to ${JSON.stringify(adf, null, 2)}`);
+          // console.log(`Setting default value for field ID ${fieldId} to ${JSON.stringify(adf, null, 2)}`);
           const defaultValue: DefaultFieldValue = {
             retain: false,
             type: "adf",

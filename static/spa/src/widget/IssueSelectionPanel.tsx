@@ -280,10 +280,12 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
 
         }
         renderedQuantityMessage = (
-          <PanelMessage
-            className="info-banner"
-            message={message} 
-          />
+          <div style={{marginBottom: '10px'}}>
+            <PanelMessage
+              className="info-banner"
+              message={message} 
+            />
+          </div>
         );
       } else {
         const message = `Found ${props.issueSearchInfo.issues.length} work items (${props.selectedIssues.length} selected)`;
