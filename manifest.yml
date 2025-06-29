@@ -38,15 +38,9 @@ permissions:
   external:
     fetch:
       backend:
-        # - "*.public.atlastunnel.com"
         - "*.atlassian.net"
-        # - "*.hello.atlassian-dev.net"
-      # client:
-      #   - "*.hello.atlassian-dev.net"
     scripts:
       - cdn.jsdelivr.net
-    # styles:
-    #   - cdn.jsdelivr.net
   content:
     styles:
       - unsafe-inline

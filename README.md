@@ -84,9 +84,14 @@ In order for the app to be able to make bulk changes as the user requeting the c
 2. Replace the values within `setup-forge-[env]-environment-private.sh` within square brackets with values for your configuration.
 3. Run `./scripts/setup-forge-[env]-environment-private.sh`.
 
-### Stepup step 4: Optionally prevent regular users from using Jira's built-in bulk operations
+### Setup step 4: Optionally prevent regular users from using Jira's built-in bulk operations
 
 This optional step involves reviewing and tuning the access to Jira's built-in bulk operations. Visit the Jira administration global permissions section, and review the permissions corresponding to "Make bulk changes".
+
+### Setup step 5: Optionally reduce external permissions
+
+To support any customer, the app declares the backend external permission `*.atlassian.net` in order for it to make basic auth requests to the Jira REST API. This can be secured further to only allow requests to the domains your instance of the app will be running on. For example, `your-tenant-stage.atlassian.net` and `your-tenant.atlassian.net`.
+
 
 ### Development Loop
 
