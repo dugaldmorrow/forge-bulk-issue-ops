@@ -101,8 +101,8 @@ export const optionalFieldNamesToIncludeInMoves: string[] = [
 
 
   // Example entries are as follows (change as necessary):
-  'Components',
-  'Affects versions',
-  'Fix versions'
+  // 'Components',
+  // 'Affects versions',
+  // 'Fix versions'
 ]
 
