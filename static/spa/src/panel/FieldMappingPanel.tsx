@@ -26,7 +26,7 @@ import { subtaskMoveStrategy } from 'src/extension/bulkOperationStaticRules';
 import { expandIssueArrayToIncludeSubtasks } from 'src/model/issueSelectionUtil';
 
 const showDebug = false;
-const showUnsupportedFields = false;
+const showUnsupportedFields = false; // KNOWN-8: Set this to true to help identify unsupported field types in bulk move operations.
 
 export type FieldMappingsState = {
   dataRetrieved: boolean;
@@ -179,9 +179,9 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
 
   const renderArrayFieldValuesSelect = (fieldId: string, targetIssueType: IssueType, fieldMappingInfo: FieldMappingInfo): JSX.Element => {
     const fieldMetadata: FieldMetadata = fieldMappingInfo.fieldMetadata;
-    console.log(`renderArrayFieldValuesSelect: fieldMetadata = ${JSON.stringify(fieldMetadata, null, 2)}`);
+    // console.log(`renderArrayFieldValuesSelect: fieldMetadata = ${JSON.stringify(fieldMetadata, null, 2)}`);
     const selectedDefaultFieldValue = targetProjectFieldsModel.getSelectedDefaultFieldValue(targetIssueType.id, fieldId);
-    console.log(`renderArrayFieldValuesSelect: selectedDefaultFieldValue = ${JSON.stringify(selectedDefaultFieldValue)}`);
+    // console.log(`renderArrayFieldValuesSelect: selectedDefaultFieldValue = ${JSON.stringify(selectedDefaultFieldValue)}`);
     const selectableCustomFieldOptions: CustomFieldOption[] = [];
     let selectedCustomFieldOption: CustomFieldOption | undefined = undefined;
     if (fieldMetadata.allowedValues && fieldMetadata.allowedValues.length) {
@@ -204,6 +204,8 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
     return (
       <FieldValuesSelect
         label={undefined}
+        isRequired={fieldMetadata.required}
+        noOptionsMessage={buildFieldPlaceholder(fieldMetadata)}
         selectableCustomFieldOptions={selectableCustomFieldOptions}
         selectedCustomFieldOption={selectedCustomFieldOption}
         menuPortalTarget={document.body}
@@ -243,6 +245,8 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
     return (
       <FieldValuesSelect
         label={undefined}
+        isRequired={fieldMetadata.required}
+        noOptionsMessage={buildFieldPlaceholder(fieldMetadata)}
         selectableCustomFieldOptions={selectableCustomFieldOptions}
         selectedCustomFieldOption={selectedCustomFieldOption}
         menuPortalTarget={document.body}
@@ -258,6 +262,10 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
     );
   }
 
+  const buildFieldPlaceholder = (fieldMetadata: FieldMetadata): string => {
+    return fieldMetadata.required ? 'Required field' : 'Optional field';
+  }
+
   const renderNumberFieldEntryWidget = (fieldId: string, targetIssueType: IssueType, fieldMappingInfo: FieldMappingInfo): JSX.Element => {
     const fieldMetadata: FieldMetadata = fieldMappingInfo.fieldMetadata;
     const selectedDefaultFieldValue = targetProjectFieldsModel.getSelectedDefaultFieldValue(targetIssueType.id, fieldId);
@@ -266,6 +274,8 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
       <Textfield
         id={`number--for-${fieldId}`}
         name={fieldId}
+        isRequired={fieldMetadata.required}
+        placeholder={buildFieldPlaceholder(fieldMetadata)}
         defaultValue={selectedDefaultFieldValue && selectedDefaultFieldValue.value.length > 0 ? selectedDefaultFieldValue.value[0] : ''}
         type="number"
         onChange={async (event): Promise<void> => {
@@ -300,6 +310,8 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
       <Textfield
         id={`string--for-${fieldId}`}
         name={fieldId}
+        isRequired={fieldMetadata.required}
+        placeholder={buildFieldPlaceholder(fieldMetadata)}
         type="text"
         onChange={async (event): Promise<void> => {
           const enteredText = event.currentTarget.value;
@@ -352,12 +364,20 @@ const FieldMappingPanel = (props: FieldMappingPanelProps) => {
 
   const renderFieldClearingWarningMessage = () => {
     return (
-      <div style={{marginBottom: '10px'}}>
-        <PanelMessage
-          className="info-banner"
-          message={`Note: Moving work items will result in fields being cleared where current values do not match destination field options.`}
-        />
-      </div>
+      <>
+        <div style={{marginBottom: '10px'}}>
+          <PanelMessage
+            className="info-banner"
+            message={`Note: Moving work items will result in fields being cleared where current values do not match destination field options.`}
+          />
+        </div>
+        <div style={{marginBottom: '10px'}}>
+          <PanelMessage
+            className="info-banner"
+            message={`Note: Optional fields will only set for task items that have existing values.`}
+          />
+        </div>
+      </>
     );
   }
 

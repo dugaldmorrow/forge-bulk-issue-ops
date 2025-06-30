@@ -37,7 +37,6 @@ export const allowedBulkMoveIssueTypeMappings = {
   'Bug': 'THE Bug'
 };
 
-
 /**
  * If this is false, bulk moves and edits will not be allowed for issues that are already resolved. This
  * effectively inserts `statusCategory != Done and ` before the JQL query used to find issues for bulk operations.
@@ -72,3 +71,38 @@ export const showLabelsEditField = true;
 
 export const advancedFilterModeEnabled = true;
 export const filterModeDefault: 'advanced' | 'basic' = 'basic';
+
+/**
+ * This is the default value that will be applied to the "retain" field parameter for each default parameter value object
+ * in the bulk move operation. See the Jira API, https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-bulk-operations/#api-rest-api-3-bulk-issues-move-post, 
+ * for more details.
+ */
+export const defaultRetainValueSetting = true;
+
+/**
+ * 
+ * ATTENTION: This feature is unreliable as it appears Jira does not always set the values of optional fields.
+ *            The Jira API, https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-bulk-operations/#api-rest-api-3-bulk-issues-move-post, 
+ *            says the following under the description of the targetMandatoryFields parameter:
+ * 
+ *            The new values will only be applied if the field is mandatory in the target project and at least one issue from the
+ *            source has that field empty, or if the field context is different in the target project (e.g. project-scoped version
+ *            fields). 
+ * 
+ * 
+ * Fields with these names will be included in the bulk move operation to allow all moved work items to be mapped to 
+ * the values for these fields as provided by the user.
+ * 
+ * Note: As per KNOWN-8, all types of fields are not supported.
+ * 
+ * This feature mitigates KNOWN-7 (see README.md).
+ */
+export const optionalFieldNamesToIncludeInMoves: string[] = [
+
+
+  // Example entries are as follows (change as necessary):
+  // 'Components',
+  // 'Affects versions',
+  // 'Fix versions'
+]
+
