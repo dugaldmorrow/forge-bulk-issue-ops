@@ -106,7 +106,7 @@ export const FieldEditor = (props: FieldEditorProps) => {
   }
 
   const onChange = async (value: FieldEditValue): Promise<OperationOutcome> => {
-    console.log(` * Setting "${field.type}" field (ID = ${field.id}) with value: ${JSON.stringify(value)}...`);
+    // console.log(` * Setting "${field.type}" field (ID = ${field.id}) with value: ${JSON.stringify(value)}...`);
     const operationOutcome: OperationOutcome = await props.onChange(value);
     if (!operationOutcome) {
       throw new Error(`No operation outcome returned from onChange for field ${field.name}.`);

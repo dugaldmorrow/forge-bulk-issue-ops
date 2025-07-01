@@ -55,9 +55,9 @@ const ImportColumnMappingPanel = (props: ImportColumnMappingPanelProps) => {
   }
 
   const updateState = async (): Promise<void> => {
-    console.log('ImportColumnMappingPanel.updateState called');
-    console.log(' * importProjectCompletionState:', props.importProjectCompletionState);
-    console.log(' * columnMappingCompletionState:', props.columnMappingCompletionState);
+    // console.log('ImportColumnMappingPanel.updateState called');
+    // console.log(' * importProjectCompletionState:', props.importProjectCompletionState);
+    // console.log(' * columnMappingCompletionState:', props.columnMappingCompletionState);
     const waitingMessage = new WaitingMessageBuilder()
       .addCheck(props.importProjectCompletionState === 'complete', 'Waiting for target project and issue type selection.')
       .build();
@@ -96,7 +96,7 @@ const ImportColumnMappingPanel = (props: ImportColumnMappingPanelProps) => {
   }
 
   useEffect(() => {
-    console.log('ImportColumnMappingPanel mounted');
+    // console.log('ImportColumnMappingPanel mounted');
   }, []);
 
   // useEffect(() => {
@@ -139,7 +139,7 @@ const ImportColumnMappingPanel = (props: ImportColumnMappingPanelProps) => {
     issueTypeCreateMetadata: IssueTypeMetadata,
     columnIndexesToMatchInfos: ObjectMapping<ImportColumnMatchInfo>
   ): boolean => {
-    console.log('doAllMandatoryFieldsHaveColumnMappings called');
+    // console.log('doAllMandatoryFieldsHaveColumnMappings called');
     if (!issueTypeCreateMetadata) {
       return false;
     }
@@ -225,7 +225,7 @@ const ImportColumnMappingPanel = (props: ImportColumnMappingPanelProps) => {
   }
 
   const onColumnSelect = async (fieldMetadata: FieldMetadata, selectedOption: undefined | Option): Promise<void> => {
-    console.log(`ImportColumnMappingPanel.onColumnSelect: selectedOption = `, selectedOption);
+    // console.log(`ImportColumnMappingPanel.onColumnSelect: selectedOption = `, selectedOption);
     const newFieldKeysToOptionMatches: ObjectMapping<ColumnOptionsMatch> = { ...fieldKeysToOptionMatches };
     const existingColumnOptionsMatch: ColumnOptionsMatch | undefined = newFieldKeysToOptionMatches[fieldMetadata.key];
     if (existingColumnOptionsMatch) {
@@ -335,7 +335,7 @@ const ImportColumnMappingPanel = (props: ImportColumnMappingPanelProps) => {
   }
 
   const renderDebug = () => {
-    console.log('ImportColumnMappingPanel.renderDebug: fieldKeysToMatchInfos = ', fieldKeysToMatchInfos);
+    // console.log('ImportColumnMappingPanel.renderDebug: fieldKeysToMatchInfos = ', fieldKeysToMatchInfos);
     return (
       <div style={{margin: '20px 0px'}}>
         <h3>Debug Information</h3>

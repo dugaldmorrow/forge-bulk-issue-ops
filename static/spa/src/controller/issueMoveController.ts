@@ -48,7 +48,7 @@ class IssueMoveController {
       const issuesToMove = subtaskMoveStrategy === 'move-subtasks-explicitly-with-parents' ?
         await expandIssueArrayToIncludeSubtasks(issues) : issues;
       for (const issue of issuesToMove) {
-        console.log(`issueMoveController.initiateMove: Processing issue ${issue.key} (type: ${issue.fields.issuetype.name})`);
+        // console.log(`issueMoveController.initiateMove: Processing issue ${issue.key} (type: ${issue.fields.issuetype.name})`);
         const sourceProjectId = issue.fields.project.id;
         const sourceIssueTypeId = issue.fields.issuetype.id;
         const targetIssueTypeId = bulkIssueTypeMappingModel.getTargetIssueTypeId(sourceProjectId, sourceIssueTypeId);
@@ -58,7 +58,7 @@ class IssueMoveController {
 
           const targetMandatoryFields = targetIssueTypeIdsToTargetMandatoryFields.get(targetIssueTypeId);
           if (targetMandatoryFields) {
-            console.log(`issueMoveController.initiateMove: Found target mandatory fields for source issue ${issue.key} (type: ${issue.fields.issuetype.name} / ${sourceIssueTypeId}) and target issue type ${targetIssueTypeId}: ${JSON.stringify(targetMandatoryFields, null, 2)}`);
+            // console.log(`issueMoveController.initiateMove: Found target mandatory fields for source issue ${issue.key} (type: ${issue.fields.issuetype.name} / ${sourceIssueTypeId}) and target issue type ${targetIssueTypeId}: ${JSON.stringify(targetMandatoryFields, null, 2)}`);
             targetIssueTypeIdsToTargetMandatoryFields.set(targetIssueTypeId, targetMandatoryFields);
           } else {
             throw new Error(`Internal error: no target mandatory fields found for source issue type ${sourceIssueTypeId}`);
@@ -120,19 +120,19 @@ class IssueMoveController {
         }
       }
       const issueIdsAdded = Object.keys(issueIdsToIssuesAddedToRequest);
-      console.log(` * Added ${issueIdsAdded.length} issues to the bulk move request: ${issueIdsAdded.join(', ')}`);
+      // console.log(` * Added ${issueIdsAdded.length} issues to the bulk move request: ${issueIdsAdded.join(', ')}`);
 
       // Step 3: Build the bulk issue move request data
       bulkIssueMoveRequestDataBuilder.setSendBulkNotification(sendBulkNotification);
       const bulkIssueMoveRequestData = bulkIssueMoveRequestDataBuilder.build();
-      console.log(` * bulkIssueMoveRequestData: ${JSON.stringify(bulkIssueMoveRequestData, null, 2)}`);
+      // console.log(` * bulkIssueMoveRequestData: ${JSON.stringify(bulkIssueMoveRequestData, null, 2)}`);
 
       // Step 4: Initiate the bulk issue move request
       const invocationResult: InvocationResult<IssueMoveEditRequestOutcome> = await jiraDataModel.initiateBulkIssuesMove(bulkIssueMoveRequestData);
       if (invocationResult.ok && invocationResult.data) {
         const requestOutcome: IssueMoveEditRequestOutcome = invocationResult.data;
         if (requestOutcome.taskId) {
-          console.log(` * Initiated bulk issue move with taskId: ${requestOutcome.taskId}`);
+          // console.log(` * Initiated bulk issue move with taskId: ${requestOutcome.taskId}`);
         } else {
           console.warn(` * Initiation of bulk move request resulted in an error: ${requestOutcome.errors}`);
         }
@@ -154,9 +154,9 @@ class IssueMoveController {
         return requestOutcome;
       }
     } else {
-      console.log(`Dumping all projects search info: `);
+      // console.log(`Dumping all projects search info: `);
       for (const project of allProjectsSearchInfo.values) {
-        console.log(` * Project: ${project.id} = ${project.name} (${project.key})`);
+        // console.log(` * Project: ${project.id} = ${project.name} (${project.key})`);
       }
       throw new Error(`Destination project ${destinationProjectId} not found`);
     }

@@ -37,9 +37,10 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
   const [selectionValidity, setStateValidity] = useState<IssueSelectionValidity>(props.computeSelectionValidity(props.issueSearchInfo.issues));
 
   useEffect(() => {
-    const selectionValidity = props.computeSelectionValidity(props.issueSearchInfo.issues);
+    // const selectionValidity = props.computeSelectionValidity(props.issueSearchInfo.issues);
+    const selectionValidity = props.computeSelectionValidity(props.selectedIssues);
     setStateValidity(selectionValidity);
-  }, [props.issueSearchInfo.issues]);
+  }, [props.selectedIssues]);
 
   const onToggleIssueSelection = async (issueToToggle: Issue): Promise<void> => {
     const newSelectedIssues: Issue[] = [];
@@ -172,12 +173,14 @@ export const IssueSelectionPanel = (props: IssueSelectionPanelProps) => {
   }
 
   const renderIssueSelectionWidget = (issue: Issue) => {
+    const isChecked = !!props.selectedIssues.find(selectedIssue => selectedIssue.key === issue.key);
+    // console.log(`IssueSelectionPanel.renderIssueSelectionWidget: issue = ${issue.key}, isChecked = ${isChecked}`);
     return (
       <div>
         <Toggle
           key={`issue-select-${issue.key}`}
           id={`toggle-${issue.key}`}
-          isChecked={!!props.selectedIssues.find(selectedIssue => selectedIssue.key === issue.key)}
+          isChecked={isChecked}
           // isDisabled={multipleProjectsDetected || globalSelectionMode !== 'Some'}
           onChange={(event: any) => {
             onToggleIssueSelection(issue);

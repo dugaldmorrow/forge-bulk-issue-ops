@@ -57,7 +57,7 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
       console.warn(`BulkOperationPanel: issueSelectionState.selectedIssues = ${JSON.stringify(issueSelectionState.selectedIssues.map(issue => issue.key))}`);
       return false;
     } else {
-      console.log(`BulkOperationPanel: crossCheckIssueSelectionState: Provided issues length matches selected issues length (${providedIssues.length}).`);
+      // console.log(`BulkOperationPanel: crossCheckIssueSelectionState: Provided issues length matches selected issues length (${providedIssues.length}).`);
       return true;
     }
   }
@@ -135,7 +135,7 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
   }
 
   const onMoveIssues = async (issueSelectionState: IssueSelectionState): Promise<void> => {
-    console.log(`BulkOperationPanel: onMoveIssuesForLevel: Moving ${issueSelectionState.selectedIssues.length} issues. Issues being moved = ${issueSelectionState.selectedIssues.map(issue => issue.key).join(', ')}`);
+    // console.log(`BulkOperationPanel: onMoveIssuesForLevel: Moving ${issueSelectionState.selectedIssues.length} issues. Issues being moved = ${issueSelectionState.selectedIssues.map(issue => issue.key).join(', ')}`);
     // Step 1: Initiate the bulk move request...
     countOfIssuesToMoveOrEdit.current = issueSelectionState.selectedIssues.length;
     const destinationProjectId: string = props.selectedToProject.id;
@@ -149,7 +149,7 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
       sendBulkNotification
     );
     setCurrentMoveEditActivity(undefined);
-    console.log(`BulkOperationPanel: bulk issue move request outcome: ${JSON.stringify(initiateOutcome, null, 2)}`);
+    // console.log(`BulkOperationPanel: bulk issue move request outcome: ${JSON.stringify(initiateOutcome, null, 2)}`);
     const taskOutcomeErrorMessage = buildTaskOutcomeErrorMessage(initiateOutcome);
     if (taskOutcomeErrorMessage) {
       const fullErrorMessage = `Failed to initiate bulk move request: ${taskOutcomeErrorMessage}`;
@@ -183,7 +183,7 @@ export const MoveOrEditPanel = (props: MoveOrEditPanelProps) => {
     setCurrentMoveEditActivity({taskId: 'non-jira-activity', description: 'Initiating bulk edit request...'});
     const initiateOutcome = await issueEditController.initiateBulkEdit();
     setCurrentMoveEditActivity(undefined);
-    console.log(`BulkOperationPanel: bulk issue edit request outcome: ${JSON.stringify(initiateOutcome, null, 2)}`);
+    // console.log(`BulkOperationPanel: bulk issue edit request outcome: ${JSON.stringify(initiateOutcome, null, 2)}`);
     const taskOutcomeErrorMessage = buildTaskOutcomeErrorMessage(initiateOutcome);
     if (taskOutcomeErrorMessage) {
       const fullErrorMessage = `Failed to initiate bulk edit request: ${taskOutcomeErrorMessage}`;

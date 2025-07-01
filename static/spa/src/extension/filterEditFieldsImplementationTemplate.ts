@@ -142,7 +142,7 @@ export const filterEditFieldsImplementation = async (fields: IssueBulkEditField[
         const fieldNameLower = field.name.toLowerCase();
         const allow = allowedFields.includes(fieldNameLower);
         if (!allow) {
-          console.log(`filterEditFieldsImplementation: Filtering out '${issueType.name}' field '${field.name}'.`);
+          // console.log(`filterEditFieldsImplementation: Filtering out '${issueType.name}' field '${field.name}'.`);
         }
         return allow;
       });

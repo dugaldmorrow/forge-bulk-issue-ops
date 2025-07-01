@@ -11,8 +11,8 @@ import { Issue } from 'src/types/Issue';
 export type ImportInstructions = {
   targetProject: Project,
   targetIssueType: IssueType,
-  columnNamesToIndexes: Record<string, number>,
-  fieldKeysToMatchInfos: Record<string, ImportColumnMatchInfo>,
+  columnNamesToIndexes: ObjectMapping<number>,
+  fieldKeysToMatchInfos: ObjectMapping<ImportColumnMatchInfo>,
   csvParseResult: CsvParseResult;
 }
 
@@ -47,7 +47,7 @@ export const importIssues = async (
   importInstructions: ImportInstructions,
   onProgressUpdate: (importCount: number, lineSkipCount: number, failCount: number, totalCount: number) => Promise<void>
 ): Promise<void> => {
-  console.log(`issueImporter.importIssues called with importInstructions: ${JSON.stringify(importInstructions, null, 2)}`);
+  // console.log(`issueImporter.importIssues called with importInstructions: ${JSON.stringify(importInstructions, null, 2)}`);
   let importCount: number = 0;
   let lineSkipCount: number = 0;
   let failCount: number = 0;
@@ -61,7 +61,7 @@ export const importIssues = async (
       lineSkipCount++;
       continue;
     }
-    console.log(`issueImporter.importIssues processing line ${lineIndex + 1} of ${totalCount}`);
+    // console.log(`issueImporter.importIssues processing line ${lineIndex + 1} of ${totalCount}`);
     const createIssueFields = await buildFieldsForCvsLine(importInstructions, csvLine, lineIndex);
     createIssueFields['project'] = {
       id: importInstructions.targetProject.id
@@ -72,11 +72,11 @@ export const importIssues = async (
     const createIssuePayload: CreateIssuePayload = {
       fields: createIssueFields
     };
-    console.log(`issueImporter.importIssues built payload: ${JSON.stringify(createIssuePayload, null, 2)}`);
+    // console.log(`issueImporter.importIssues built payload: ${JSON.stringify(createIssuePayload, null, 2)}`);
     const issue = await createIssue(createIssuePayload, 1, 3);
     if (issue) {
       importCount++;
-      console.log(`Issue created successfully: ${issue.key}`);
+      // console.log(`Issue created successfully: ${issue.key}`);
     } else {
       failCount++;
       console.error('Error creating issue');
@@ -97,7 +97,7 @@ const createIssue = async (createIssuePayload: CreateIssuePayload, attemptNumber
   });
   if (response.ok) {
     const data = await response.json();
-    console.log('Issue created successfully:', data);
+    // console.log('Issue created successfully:', data);
     return data as Issue;
   } else {
     const status = response.status;

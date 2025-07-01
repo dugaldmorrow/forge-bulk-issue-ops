@@ -91,7 +91,7 @@ export const FieldEditsPanel = (props: FieldEditsPanelProps) => {
   const onFieldChange = async (field: IssueBulkEditField, value: FieldEditValue): Promise<OperationOutcome> => {
     const setFieldOutcome = await editedFieldsModel.setFieldValue(field, value);
     if (!setFieldOutcome.success) {
-      console.log(`FieldEditsPanel.onFieldChange: Failed to set field value for field ${field.id}: ${setFieldOutcome.errorMessage}`);
+      // console.log(`FieldEditsPanel.onFieldChange: Failed to set field value for field ${field.id}: ${setFieldOutcome.errorMessage}`);
       // No need to show a flag here or otherwise as the field editor will show the error.
     }
 

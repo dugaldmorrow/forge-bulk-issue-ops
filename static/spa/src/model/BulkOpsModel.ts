@@ -3,8 +3,6 @@ import { CompletionState } from "src/types/CompletionState";
 import ListenerGroup from "./ListenerGroup";
 import { debounce } from "./util";
 
-export const importStepSequence: ImportStepName[] = ['file-upload'];
-
 export type CompletionStateChangeInfo = {
   stepName: StepName;
   completionState: CompletionState;
@@ -48,6 +46,18 @@ export class BulkOpsModel<StepNameSubtype extends StepName> {
     return this.stepSequence;
   }
 
+  public getStepNamesToCompletionStates = (): Record<StepNameSubtype, CompletionState> => {
+    return this.stepNamesToCompletionStates;
+  }
+
+  public getStepCompletionState = (stepName: StepNameSubtype): CompletionState => {
+    const state = this.stepNamesToCompletionStates[stepName];
+    if (state === undefined) {
+      throw new Error(`Step "${stepName}" not found in step names to completion states.`);
+    }
+    return state;
+  }
+
   public getDownstreamSteps = (stepName: StepNameSubtype): StepNameSubtype[] => {
     const stepIndex = this.stepSequence.indexOf(stepName);
     if (stepIndex === -1) {
@@ -83,34 +93,36 @@ export class BulkOpsModel<StepNameSubtype extends StepName> {
   }
 
   public setStepCompletionState = (stepName: StepNameSubtype, completionState: CompletionState): void => {
-    let changedStepNames: StepNameSubtype[] = [];
-    if (this.stepNamesToCompletionStates[stepName] !== completionState) {
+    const previousCompletionState = this.stepNamesToCompletionStates[stepName];
+    if (previousCompletionState !== completionState) {
+      // console.log(`BulkOpsModel.setStepCompletionState(${this.modelName}): Step "${stepName}" is changing state from "${previousCompletionState}" to "${completionState}"...`);
+      let changedStepNames: StepNameSubtype[] = [];
       changedStepNames.push(stepName);
       this.stepNamesToCompletionStates[stepName] = completionState;
       if (completionState !== 'complete') {
         const downstreamSteps = this.stepSequence.slice(this.stepSequence.indexOf(stepName) + 1);
-        console.log(`BulkOpsModel(${this.modelName}): * downstreamSteps = ${downstreamSteps.join(', ')}`);
+        // console.log(`BulkOpsModel(${this.modelName}): * downstreamSteps = ${downstreamSteps.join(', ')}`);
         for (const downstreamStep of downstreamSteps) {
           if (this.stepNamesToCompletionStates[downstreamStep] !== 'complete') {
-            console.log(`BulkOpsModel(${this.modelName}): Resetting downstream step "${downstreamStep}" to "incomplete" due to upstream step "${stepName}" being set to "incomplete".`);
+            // console.log(`BulkOpsModel(${this.modelName}): Resetting downstream step "${downstreamStep}" to "incomplete" due to upstream step "${stepName}" being set to "incomplete".`);
             // If a downstream step is complete, we need to reset it to incomplete
             this.stepNamesToCompletionStates[downstreamStep] = 'incomplete';
             changedStepNames.push(downstreamStep);
           } else {
-            console.log(`BulkOpsModel(${this.modelName}): Downstream step "${downstreamStep}" is already "${this.stepNamesToCompletionStates[downstreamStep]}", no action needed.`);
+            // console.log(`BulkOpsModel(${this.modelName}): Downstream step "${downstreamStep}" is already "${this.stepNamesToCompletionStates[downstreamStep]}", no action needed.`);
           }
         }
       }
-    }
-    if (changedStepNames.length > 0) {
-      // Notify in the reverse order since this makes logical sense in terms of keeping the overall state sane.
-      for (let i = changedStepNames.length - 1; i >= 0; i--) {
-        const changedStepName = changedStepNames[i];
-        const stepCompletionState = this.stepNamesToCompletionStates[changedStepName];
-        console.log(`BulkOpsModel(${this.modelName}): Sending step "${changedStepName}" completion state notification: "${stepCompletionState}"`);
-        this.notifyStepCompletionStateChangeListeners(changedStepName, stepCompletionState);
+      if (changedStepNames.length > 0) {
+        // Notify in the reverse order since this makes logical sense in terms of keeping the overall state sane.
+        for (let i = changedStepNames.length - 1; i >= 0; i--) {
+          const changedStepName = changedStepNames[i];
+          const stepCompletionState = this.stepNamesToCompletionStates[changedStepName];
+          // console.log(`BulkOpsModel.setStepCompletionState(${this.modelName}): Sending step "${changedStepName}" completion state notification: "${stepCompletionState}"`);
+          this.notifyStepCompletionStateChangeListeners(changedStepName, stepCompletionState);
+        }
+        this.updateModelTimestamp();
       }
-      this.updateModelTimestamp();
     }
   }
 

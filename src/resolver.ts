@@ -15,7 +15,7 @@ resolver.define('initiateBulkMove', async (request: any) => {
 });
 
 resolver.define('initiateBulkEdit', async (request: any) => {
-  // console.log(`initiateBulkEdit request: ${JSON.stringify(request, null, 2)}`);
+  console.log(`initiateBulkEdit request: ${JSON.stringify(request, null, 2)}`);
   const context = request.context;
   const payload = request.payload;
   const accountId = context.accountId;

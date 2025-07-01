@@ -44,7 +44,7 @@ import { FilterPanel } from './FilterPanel';
 import { IssueSelectionState } from 'src/types/IssueSelectionState';
 import { IssueSelectionValidity } from 'src/types/IssueSelectionValidity';
 import { equalIssueSelections, newIssueSelectionUuid, selectionToString } from 'src/model/issueSelectionUtil';
-import { applyDebouncingDelay } from 'src/model/util';
+import { Destructor } from 'src/types/Destructor';
 
 const showDebug = false;
 const showCompletionStateDebug = false;
@@ -63,10 +63,8 @@ type DebugInfo = {
 
 const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
 
-  const [stepNamesToCompletionStates, setStepNamesToCompletionStates] = useState<ObjectMapping<CompletionState>>({});
-  const stepNamesToCompletionStatesRef = useRef<ObjectMapping<CompletionState>>(stepNamesToCompletionStates);
+  const [stepNamesToCompletionStates, setStepNamesToCompletionStates] = useState<ObjectMapping<CompletionState>>(props.bulkOpsModel.getStepNamesToCompletionStates());
   const [modelUpdateTimestamp, setLastModelUpdateTime] = useState<number>(0);
-  const [stepSequence, setStepSequence] = useState<StepName[]>([])
   const [bulkOperationMode, setBulkOperationMode] = useState<BulkOperationMode>(props.bulkOperationMode);
   const [mainWarningMessage, setMainWarningMessage] = useState<string>('');
   const [lastDataLoadTime, setLastDataLoadTime] = useState<number>(0);
@@ -88,36 +86,50 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
 
   // Don't use the following to trigger rendering. i.e. child components shouldn't have a useEffect dependent on this.
   const fieldMappingsState = useRef<FieldMappingsState>(nilFieldMappingsState);
+  
+  useEffect(() => {
+    return onMount();
+  }, []);
 
   useEffect(() => {
     setBulkOperationMode(props.bulkOperationMode);
   }, [props.bulkOperationMode]);
 
+  const onMount = (): void | Destructor => {
+    // console.log(`BulkOperationPanel.onMount: Mounting BulkOperationPanel...`);
+    // console.log(`BulkOperationPanel.onMount: stepNamesToCompletionStates = ${JSON.stringify(stepNamesToCompletionStates, null, 2)}`);
+    initialiseSelectedIssueTypes(2);
+    if (showDebug) {
+      retrieveAndSetDebugInfo();
+    }
+    editedFieldsModel.registerValueEditsListener(onEditedFieldsModelChange);
+    props.bulkOpsModel.registerStepCompletionStateChangeListener(onStepCompletionStateChange);
+    props.bulkOpsModel.registerModelUpdateChangeListener(onModelUpdateChange);
+    return () => {
+      // console.log(`BulkOperationPanel.onMount: Unmounting BulkOperationPanel...`);
+      editedFieldsModel.unregisterValueEditsListener(onEditedFieldsModelChange);
+      props.bulkOpsModel.unregisterStepCompletionStateChangeListener(onStepCompletionStateChange);
+      props.bulkOpsModel.unregisterModelUpdateChangeListener(onModelUpdateChange);
+    };
+  }
+
   const onEditedFieldsModelChange = (fieldId: string, value: any) => {
     setFieldIdsToValuesTime(Date.now());
   }
 
-  const onImportModelStepCompletionStateChange = (completionStateChangeInfo: CompletionStateChangeInfo) => {
+  const onStepCompletionStateChange = (completionStateChangeInfo: CompletionStateChangeInfo) => {
     const stepName = completionStateChangeInfo.stepName;
     const completionState = completionStateChangeInfo.completionState;
-    console.log(`BulkOperationPanel.onImportModelStepCompletionStateChange: step "${stepName}" is now "${completionState}"`);
-    updateStepCompletionState(stepName, completionState);
+    // console.log(`BulkOperationPanel.onStepCompletionStateChange: step "${stepName}" is now "${completionState}"`);
+    updateStepCompletionState(stepName, completionState, false);
+    if (completionState === 'incomplete') {
+      clearStepStateAfter(stepName);
+    }
   }
 
   const onModelUpdateChange = (modelUpdateTimestamp: number) => {
     setLastModelUpdateTime(modelUpdateTimestamp);
   }
-
-  useEffect(() => {
-    editedFieldsModel.registerValueEditsListener(onEditedFieldsModelChange);
-    props.bulkOpsModel.registerStepCompletionStateChangeListener(onImportModelStepCompletionStateChange);
-    props.bulkOpsModel.registerModelUpdateChangeListener(onModelUpdateChange);
-    return () => {
-      editedFieldsModel.unregisterValueEditsListener(onEditedFieldsModelChange);
-      props.bulkOpsModel.unregisterStepCompletionStateChangeListener(onImportModelStepCompletionStateChange);
-      props.bulkOpsModel.unregisterModelUpdateChangeListener(onModelUpdateChange);
-    };
-  }, []);
 
   const setIssueMoveOutcome = (issueMoveOutcome: undefined | TaskOutcome) => {
     // Do nothing - this is now obsolte
@@ -134,43 +146,52 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     return stepIndex >= 0;
   }
 
-  const defineSteps = () => {
-    const stepSequence = props.bulkOpsModel.getStepSequence();
-    setStepSequence(stepSequence);
-  }
-
   const cloneStepNamesToCompletionStates = (): ObjectMapping<CompletionState> => {
     // console.log(`BulkOperationPanel.cloneStepNamesToCompletionStates: Cloning step names to completion states...`);
     const clonedStates: ObjectMapping<CompletionState> = {};
-    for (const stepName of stepSequence) {
-      clonedStates[stepName] = stepNamesToCompletionStatesRef.current[stepName];
+    for (const stepName of props.bulkOpsModel.getStepSequence()) {
+      const newCompletionState = props.bulkOpsModel.getStepCompletionState(stepName);
+      // const newCompletionState = stepNamesToCompletionStatesRef[stepName] === 'complete' ? 'complete' : 'incomplete';
+      clonedStates[stepName] = newCompletionState;
     }
     return clonedStates;
   }
 
-  const updateStepCompletionState = (stepName: StepName, completionState: CompletionState): void => {
-    // console.log(`BulkOperationPanel.updateStepCompletionState: Setting step "${stepName}" state to "${completionState}"....`);
+  const updateStepCompletionState = (stepName: StepName, completionState: CompletionState, updateModel: boolean = true): void => {
+    // console.log(`BulkOperationPanel.updateStepCompletionState: Updating step "${stepName}" state from "${getStepCompletionState(stepName, false)}" to "${completionState}".`);
+    if (updateModel) {
+      props.bulkOpsModel.setStepCompletionState(stepName, completionState);
+    }
     const newStepNamesToCompletionStates = cloneStepNamesToCompletionStates();
     newStepNamesToCompletionStates[stepName] = completionState;
     setStepNamesToCompletionStates(newStepNamesToCompletionStates);
-    stepNamesToCompletionStatesRef.current = newStepNamesToCompletionStates;
   }
 
   const onEditsValidityChange = (valid: boolean) => {
     updateStepCompletionState('edit-fields', valid ? 'complete' : 'incomplete');
   }
 
-  const getStepCompletionState = (stepName: StepName): CompletionState => {
-    return stepNamesToCompletionStates[stepName];
+  const getRenderingStepCompletionState = (stepName: StepName): CompletionState => {
+    return getStepCompletionState(stepName, true);
+  }
+
+  const getStepCompletionState = (stepName: StepName, rendering: boolean): CompletionState => {
+    if (rendering) {
+      const state = stepNamesToCompletionStates[stepName] === 'complete' ? 'complete' : 'incomplete'; // guards against an undefined state
+      return state;
+    } else {
+      return props.bulkOpsModel.getStepCompletionState(stepName);
+    }
   }
 
   const arePrerequisiteStepsComplete = (priorToStepName: StepName, rendering: boolean): boolean => {
     let complete = true;
+    const stepSequence = props.bulkOpsModel.getStepSequence();
     for (const stepName of stepSequence) {
       if (stepName === priorToStepName) {
         break; // Stop checking once we reach the step we're interested in
       }
-      const completionState = rendering ? stepNamesToCompletionStates[stepName] : stepNamesToCompletionStatesRef.current[stepName];
+      const completionState = getStepCompletionState(stepName, rendering);
       if (isStepApplicableToBulkOperationMode(stepName)) {
         if (completionState !== 'complete') {
           // console.log(`BulkOperationPanel.arePrerequisiteStepsComplete: Step "${stepName}" is not complete.`);
@@ -183,11 +204,11 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const renderStepCompletionState = (): JSX.Element => {
+    const stepSequence = props.bulkOpsModel.getStepSequence();
     const renderedStates = stepSequence.map((stepName: StepName) => {
-      const completionState = stepNamesToCompletionStates[stepName];
       return (
         <li key={stepName}>
-          {`${stepName}: ${stepNamesToCompletionStates[stepName]} / ${stepNamesToCompletionStatesRef.current[stepName]}`}
+          {`${stepName}: ${stepNamesToCompletionStates[stepName]}`}
         </li>
       );
     });
@@ -241,15 +262,6 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     }
   }
 
-  useEffect(() => {
-    defineSteps();
-    // updateAllProjectInfo();
-    initialiseSelectedIssueTypes(2);
-    if (showDebug) {
-      retrieveAndSetDebugInfo();
-    }
-  }, []);
-
   const filterProjectsForToSelection = async (projectsToFilter: Project[]): Promise<Project[]> => {
     const allowableToProjects = await bulkOperationRuleEnforcer.filterTargetProjects(issueSelectionState.selectedIssues, projectsToFilter);
     return allowableToProjects;
@@ -299,6 +311,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const onIssuesLoaded = async (allSelected: boolean, newIssueSearchInfo: IssueSearchInfo) => {
+    // console.log(`BulkOperationPanel.onIssuesLoaded: allSelected = ${allSelected}, newIssueSearchInfo = ${newIssueSearchInfo.issues.map(issue => issue.key).join(', ')}`);
     const newlySelectedIssues = newIssueSearchInfo.issues;
     const newIssueSelectionState: IssueSelectionState = {
       uuid: newIssueSelectionUuid(),
@@ -308,13 +321,13 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     // console.log(`BulkOperationPanel.onIssuesLoaded: new issue selection state = ${selectionToString(newIssueSelectionState)}`);
     setIssueSelectionState(newIssueSelectionState);
     setSelectedIssuesTime(Date.now());
-    // console.log(`BulkOperationPanel: onIssuesLoaded: newlySelectedIssues = ${newlySelectedIssues.map(issue => issue.key).join(', ')}`);
-    await targetProjectFieldsModel.setSelectedIssues(newlySelectedIssues, allIssueTypes);
     setIssueSearchInfo(newIssueSearchInfo);
     setIssueSearchInfoTime(Date.now());
     setLastDataLoadTime(Date.now());
+    // console.log(`BulkOperationPanel.onIssuesLoaded: newlySelectedIssues = ${newlySelectedIssues.map(issue => issue.key).join(', ')}`);
+    await targetProjectFieldsModel.setSelectedIssues(newlySelectedIssues, allIssueTypes);
     clearFieldMappingsState();
-    const newState = updateStepCompletionState('issue-selection', newIssueSelectionState.selectionValidity === 'valid' ? 'complete' : 'incomplete');
+    updateStepCompletionState('issue-selection', newIssueSelectionState.selectionValidity === 'valid' ? 'complete' : 'incomplete');
     updateMappingsCompletionStates();
   }
 
@@ -343,7 +356,11 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     if (stepName === 'filter') {
       // Do nothing
     } else if (stepName === 'issue-selection') {
-      const newIssueSelectionState: IssueSelectionState = {uuid: newIssueSelectionUuid(), selectedIssues: [], selectionValidity: 'invalid-no-issues-selected'};
+      const newIssueSelectionState: IssueSelectionState = {
+        uuid: newIssueSelectionUuid(),
+        selectedIssues: [],
+        selectionValidity: 'invalid-no-issues-selected'
+      };
       // console.log(`BulkOperationPanel.clearStepState: new issue selection state = ${selectionToString(newIssueSelectionState)}`);
       setIssueSelectionState(newIssueSelectionState);
       setSelectedIssuesTime(Date.now());
@@ -361,13 +378,13 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     } else if (stepName === 'move-or-edit') {
       setIssueMoveOutcome(undefined);
     } else if (stepName === 'file-upload') {
-      // This is yet to be implemented
+      stateShouldBecomeIncomplete = false;
     } else if (stepName === 'column-mapping') {
-      // This is yet to be implemented
+      // stateShouldBecomeIncomplete = false;
     } else if (stepName === 'project-and-issue-type-selection') {
-      // This is yet to be implemented
+      // stateShouldBecomeIncomplete = false;
     } else if (stepName === 'import-issues') {
-      // This is yet to be implemented
+      // stateShouldBecomeIncomplete = false;
     } else {
       console.warn(`BulkOperationPanel.clearStepState: No action defined for step "${stepName}".`);
     }
@@ -379,6 +396,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const clearStepStateAfter = (stepName: StepName) => {
+    // console.log(`BulkOperationPanel.clearStepStateAfter: Clearing state after step "${stepName}"`);
     const nextDownstreamStep = props.bulkOpsModel.getNextDownstreamStep(stepName);
     if (nextDownstreamStep) {
       clearStepState(nextDownstreamStep);
@@ -394,6 +412,11 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   const onIssueSearchCompleted = async (issueSearchInfo: IssueSearchInfo): Promise<void> => {
     clearStepStateAfter('filter');
 
+    const issueCount = issueSearchInfo.issues.length;
+    const newFilterStepCompletionState = issueCount > 0 ? 'complete' : 'incomplete';
+    // console.log(`BulkOperationPanel.onIssueSearchCompleted: issueCount = ${issueCount}, newFilterStepCompletionState = ${newFilterStepCompletionState}`);
+    updateStepCompletionState('filter', newFilterStepCompletionState);
+
     // KNOWN-18: Should handle the Jira API returning an error when searching for issues.
     // if (issueSearchInfo.errorMessages && issueSearchInfo.errorMessages.length) {
     //   const joinedErrors = issueSearchInfo.errorMessages.join( );
@@ -401,8 +424,8 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     // } else {
       await onIssuesLoaded(true, issueSearchInfo);
     // }
-    const issueCount = issueSearchInfo.issues.length;
-    updateStepCompletionState('filter', issueCount > 0 ? 'complete' : 'incomplete');
+    // const issueCount = issueSearchInfo.issues.length;
+    // updateStepCompletionState('filter', issueCount > 0 ? 'complete' : 'incomplete');
     setIssueLoadingState('idle');
   }
 
@@ -526,7 +549,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const renderFileUploadPanel = (stepNumber: number) => {
-    const completionState = getStepCompletionState('file-upload');
+    const completionState = getRenderingStepCompletionState('file-upload');
     return (
       <div className="padding-panel">
         <div className="content-panel">
@@ -547,8 +570,8 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const renderProjectAndIssueTypeSelectionPanel = (stepNumber: number) => {
-    const fileUploadCompletionState = getStepCompletionState('file-upload');
-    const projectAndIssueTypeSelectionCompletionState = getStepCompletionState('project-and-issue-type-selection');
+    const fileUploadCompletionState = getRenderingStepCompletionState('file-upload');
+    const projectAndIssueTypeSelectionCompletionState = getRenderingStepCompletionState('project-and-issue-type-selection');
     return (
       <div className="padding-panel">
         <div className="content-panel">
@@ -570,8 +593,8 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const renderColumnMappingPanel = (stepNumber: number) => {
-    const importProjectCompletionState = getStepCompletionState('project-and-issue-type-selection');
-    const columnMappingCompletionState = getStepCompletionState('column-mapping');
+    const importProjectCompletionState = getRenderingStepCompletionState('project-and-issue-type-selection');
+    const columnMappingCompletionState = getRenderingStepCompletionState('column-mapping');
     return (
       <div className="padding-panel">
         <div className="content-panel">
@@ -595,8 +618,8 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const renderImportIssuesPanel = (stepNumber: number) => {
-    const columnMappingCompletionState = getStepCompletionState('column-mapping');
-    const importIssuesCompletionState = getStepCompletionState('import-issues');
+    const columnMappingCompletionState = getRenderingStepCompletionState('column-mapping');
+    const importIssuesCompletionState = getRenderingStepCompletionState('import-issues');
     return (
       <div className="padding-panel">
         <div className="content-panel">
@@ -624,7 +647,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
           <PanelHeader
             stepNumber={stepNumber}
             label={`Find work items to ${bulkOperationMode.toLowerCase()}`}
-            completionState={getStepCompletionState('filter')}
+            completionState={getRenderingStepCompletionState('filter')}
           />
           <FilterPanel
             bulkOperationMode={bulkOperationMode}
@@ -648,13 +671,14 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       .addCheck(arePrerequisiteStepsComplete('issue-selection', true), 'Waiting for previous step to be completed.')
       .build();
     let panelLabel = `Select work items to ${bulkOperationMode.toLowerCase()}`;
+    // console.log(`BulkOperationPanel.renderIssuesPanel: issue selection state = ${selectionToString(issueSelectionState)}`);
     return (
       <div className="padding-panel">
         <div className="content-panel">
           <PanelHeader
             stepNumber={stepNumber}
             label={panelLabel}
-            completionState={getStepCompletionState('issue-selection')}
+            completionState={getRenderingStepCompletionState('issue-selection')}
           />
           {renderPanelMessage(waitingMessage, {marginTop: '20px', marginBottom: '20px'})}
           <IssueSelectionPanel
@@ -696,7 +720,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
           <PanelHeader
             stepNumber={stepNumber}
             label="Select target project"
-            completionState={getStepCompletionState('target-project-selection')}
+            completionState={getStepCompletionState('target-project-selection', true)}
           />
           {renderPanelMessage(waitingMessage, {marginTop: '20px', marginBottom: '20px'})}
           {renderToProjectSelect()}
@@ -728,7 +752,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
             stepNumber={stepNumber}
             label="Work item type mapping"
             // completionState={'incomplete'}
-            completionState={getStepCompletionState('issue-type-mapping')}
+            completionState={getRenderingStepCompletionState('issue-type-mapping')}
           />
           {renderPanelMessage(waitingMessage, {marginTop: '20px', marginBottom: '20px'})}
           {renderStartFieldMappingButton()}
@@ -750,8 +774,8 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     const waitingMessage = new WaitingMessageBuilder()
       .addCheck(arePrerequisiteStepsComplete('field-mapping', true), 'Waiting for previous steps to be completed.')
       .build();
-    const issueTypeMappingStepCompletionState = getStepCompletionState('issue-type-mapping');
-    const fieldMappingCompletionState = getStepCompletionState('field-mapping');
+    const issueTypeMappingStepCompletionState = getRenderingStepCompletionState('issue-type-mapping');
+    const fieldMappingCompletionState = getRenderingStepCompletionState('field-mapping');
     return (
       <div className="padding-panel">
         <div className="content-panel">
@@ -786,7 +810,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
           <PanelHeader
             stepNumber={stepNumber}
             label={`Set work item field values`}
-            completionState={getStepCompletionState('edit-fields')}
+            completionState={getRenderingStepCompletionState('edit-fields')}
           />
           <FieldEditsPanel
             issueSelectionState={issueSelectionState}
@@ -810,7 +834,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
           <PanelHeader
             stepNumber={stepNumber}
             label={`${bulkOperationMode} work items`}
-            completionState={getStepCompletionState('move-or-edit')}
+            completionState={getRenderingStepCompletionState('move-or-edit')}
           />
           <MoveOrEditPanel
             bulkOperationMode={bulkOperationMode}

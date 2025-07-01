@@ -5,7 +5,7 @@ import { getBasicAuthHeader, getBulkOpsAppGroupId } from './userManagementConfig
 import { ServerInfo } from './types/ServerInfo';
 
 // This is set to false since the app user can't be authorized to add/remove users to/from groups.
-const manageUserGroupsUsingAppUserAccount = false;
+const manageUserGroupsUsingAppUserAccount = true;
 
 const maxBulkOperationRetries = 3;
 const initialRetryDelay = 2000;

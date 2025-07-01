@@ -13,7 +13,7 @@ export const IssueLink = (props: IssueLinkProps) => {
       onClick={() => {
         const viewIssueModal = new ViewIssueModal({
           onClose: () => {
-            console.log('ViewIssueModal closed');
+            // console.log('ViewIssueModal closed');
           },
           context: {
             issueKey: props.issueKey,

@@ -55,22 +55,22 @@ const LabelsSelect = (props: LabelsSelectProps) => {
   const promiseOptions = async (inputValue: string): Promise<Option[]> => {
     lastInvocationNumberRef.current = lastInvocationNumberRef.current + 1;
     const myInvocationNumber = lastInvocationNumberRef.current;
-    console.log(`LabelsSelect: In promiseOptions (inputValue = '${inputValue}')`);
+    // console.log(`LabelsSelect: In promiseOptions (inputValue = '${inputValue}')`);
     setLoadingLabels(true);
     try {
       setUserInput(inputValue);
       const retreveLabelInvocationResult = await jiraDataModel.suggestLabels(inputValue);
       if (retreveLabelInvocationResult.ok) {
         const retrevedLabels: JiraLabel[] = retreveLabelInvocationResult.data.results;
-        console.log(`LabelsSelect.promiseOptions: retrevedLabels for inputValue = ${inputValue} (userInput = ${userInput})`);
+        // console.log(`LabelsSelect.promiseOptions: retrevedLabels for inputValue = ${inputValue} (userInput = ${userInput})`);
         if (myInvocationNumber >= lastInvocationNumberRef.current) {
-          console.log(`LabelsSelect.promiseOptions: userInput is still '${inputValue}', applying results: ${JSON.stringify(retrevedLabels)}`);
+          // console.log(`LabelsSelect.promiseOptions: userInput is still '${inputValue}', applying results: ${JSON.stringify(retrevedLabels)}`);
           const foundLabels = filterLabels(retrevedLabels);
           setLabels(foundLabels);
           return labelsToOptions(foundLabels);
         } else {
           // Return options from filteredProjects since this invocation is stale.
-          console.log(`LabelsSelect.promiseOptions: userInput changed from '${userInput}' to '${inputValue}', ignoring results`);
+          // console.log(`LabelsSelect.promiseOptions: userInput changed from '${userInput}' to '${inputValue}', ignoring results`);
           const options = labelsToOptions(labels);
           return options;
         }
@@ -103,7 +103,7 @@ const LabelsSelect = (props: LabelsSelectProps) => {
     }
     
     // Reset the user input since the UI clears the text in the select field...
-    console.log(`LabelsSelect.onChange: selectedLabels = ${JSON.stringify(selectedLabels)}, resetting userInput...`);
+    // console.log(`LabelsSelect.onChange: selectedLabels = ${JSON.stringify(selectedLabels)}, resetting userInput...`);
     await promiseOptions('');
     await props.onLabelsSelect(selectedLabels);
   }

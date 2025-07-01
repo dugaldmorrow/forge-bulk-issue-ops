@@ -15,7 +15,6 @@ import bulkOperationRuleEnforcer from '../extension/bulkOperationRuleEnforcer';
 import { 
   allowBulkEditsAcrossMultipleProjects,
   allowBulkMovesFromMultipleProjects,
-  enableTheAbilityToBulkChangeResolvedIssues,
   advancedFilterModeEnabled,
   filterModeDefault,
   showLabelsSelect,
@@ -106,7 +105,7 @@ export const FilterPanel = (props: FilterPanelProps) => {
           break;
         }
         if (issueStatus.name === statusToExclude) {
-          console.log(`FilterPanel.filterRetrieveIssues: Issue ${issue.key} has status "${issueStatus.name}" which is excluded from bulk operations.`);
+          // console.log(`FilterPanel.filterRetrieveIssues: Issue ${issue.key} has status "${issueStatus.name}" which is excluded from bulk operations.`);
           includeIssue = false;
           break;
         }

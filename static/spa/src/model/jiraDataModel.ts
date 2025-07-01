@@ -481,7 +481,7 @@ class JiraDataModel {
       });
       invocationResult = await this.readResponse<IssueMoveEditRequestOutcome>(response);
     }
-    console.log(`Bulk issue move invocation result: ${JSON.stringify(invocationResult, null, 2)}`);
+    // console.log(`Bulk issue move invocation result: ${JSON.stringify(invocationResult, null, 2)}`);
     return invocationResult;
   }
 
@@ -502,7 +502,7 @@ class JiraDataModel {
       });
       invocationResult = await this.readResponse<IssueMoveEditRequestOutcome>(response);
     }
-    console.log(`Bulk issue edit invocation result: ${JSON.stringify(invocationResult, null, 2)}`);
+    // console.log(`Bulk issue edit invocation result: ${JSON.stringify(invocationResult, null, 2)}`);
     return invocationResult;
   }
 
@@ -532,7 +532,7 @@ class JiraDataModel {
    
     // console.log(`Response: ${response.status} ${response.statusText}`);
     const outcome = await response.json();
-    console.log(`Task outcome: ${JSON.stringify(outcome, null, 2)}`);
+    // console.log(`Task outcome: ${JSON.stringify(outcome, null, 2)}`);
     return outcome;
   }
   
@@ -571,7 +571,7 @@ class JiraDataModel {
     while (loadMoreItems) {
       const projectsFieldConfigurationSchemeMappings = await this.pageOfFieldConfigurationSchemesForProjects(
         [projectId], startAt, maxResultsPerPage);
-      console.log(`projectsFieldConfigurationSchemeMappings = ${JSON.stringify(projectsFieldConfigurationSchemeMappings, null, 2)}`);
+      // console.log(`projectsFieldConfigurationSchemeMappings = ${JSON.stringify(projectsFieldConfigurationSchemeMappings, null, 2)}`);
       for (const projectFieldConfigurationSchemeMapping of projectsFieldConfigurationSchemeMappings.values) {
         if (projectFieldConfigurationSchemeMapping.projectIds.includes(projectId)) {
           return projectFieldConfigurationSchemeMapping.fieldConfigurationScheme;
@@ -602,7 +602,7 @@ class JiraDataModel {
     });
     // console.log(`Response: ${response.status} ${response.statusText}`);
     const outcome = await response.json() as PageResponse<ProjectsFieldConfigurationSchemeMapping>;
-    console.log(`Project field configuration schemes: ${JSON.stringify(outcome, null, 2)}`);
+    // console.log(`Project field configuration schemes: ${JSON.stringify(outcome, null, 2)}`);
     return outcome;  
   }
   
@@ -637,7 +637,7 @@ class JiraDataModel {
     });
     // console.log(`Response: ${response.status} ${response.statusText}`);
     const outcome = await response.json();
-    console.log(`Field configuration items: ${JSON.stringify(outcome, null, 2)}`);
+    // console.log(`Field configuration items: ${JSON.stringify(outcome, null, 2)}`);
     return outcome;
   }
   
@@ -678,7 +678,7 @@ class JiraDataModel {
     });
     // console.log(`Response: ${response.status} ${response.statusText}`);
     const outcome = await response.json();
-    console.log(`Custom field context project mappings: ${JSON.stringify(outcome, null, 2)}`);
+    // console.log(`Custom field context project mappings: ${JSON.stringify(outcome, null, 2)}`);
     return outcome;
   }
   
@@ -715,7 +715,7 @@ class JiraDataModel {
     });
     // console.log(`Response: ${response.status} ${response.statusText}`);
     const outcome = await response.json();
-    console.log(`getCustomFieldContexts response: ${JSON.stringify(outcome, null, 2)}`);
+    // console.log(`getCustomFieldContexts response: ${JSON.stringify(outcome, null, 2)}`);
     return outcome;
   }
   

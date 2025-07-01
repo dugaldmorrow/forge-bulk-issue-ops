@@ -17,11 +17,11 @@ const FileUploadPanel = (props: FileUploadPanelProps) => {
   const [columnIndexesToColumnNames, setColumnIndexesToColumnNames] = React.useState<any>({});
 
   useEffect(() => {
-    console.log('FileUploadPanel mounted');
+    // console.log('FileUploadPanel mounted');
   }, []);
 
   const onFileSelected = async (file: undefined | File) => {
-    console.log('onFileSelected called');
+    // console.log('onFileSelected called');
     const fileParseResult = await importModel.onFileSelection(file);
 
     if (!fileParseResult.success) {

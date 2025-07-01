@@ -105,7 +105,7 @@ class IssueEditController {
         return;
       }
       selectedActions.push(field.id);
-      console.log(` * Setting "${field.type}" field (ID = ${field.id}) with value: ${editedFieldValue.value}...`);
+      // console.log(` * Setting "${field.type}" field (ID = ${field.id}) with value: ${editedFieldValue.value}...`);
       switch (field.type) {
         case 'issuetype':
           const jiraIssueTypeField: JiraIssueTypeField = {
@@ -206,7 +206,7 @@ class IssueEditController {
             bulkEditMultiSelectFieldOption: editedFieldValue.multiSelectFieldOption,
             components: componentIdObjects
           }
-          console.log(`   - Built jiraMultiSelectComponentField: ${JSON.stringify(jiraMultiSelectComponentField)} from editedFieldValue ${JSON.stringify(editedFieldValue)}.`);
+          // console.log(`   - Built jiraMultiSelectComponentField: ${JSON.stringify(jiraMultiSelectComponentField)} from editedFieldValue ${JSON.stringify(editedFieldValue)}.`);
           editedFieldsInputBuilder.setMultiselectComponents(jiraMultiSelectComponentField);
           break;
         case 'duedate':

@@ -9,7 +9,7 @@ import { ObjectMapping } from 'src/types/ObjectMapping';
 import { renderPanelMessage } from 'src/widget/PanelMessage';
 import { ImportInstructions, importIssues } from 'src/controller/issueImporter';
 import { ProgressInfo } from 'src/types/ProgressInfo';
-import { Label } from '@atlaskit/form';
+import { FormSection, Label } from '@atlaskit/form';
 import WarningSymbol from 'src/widget/WarningSymbol';
 import SuccessSymbol from 'src/widget/SuccessSymbol';
 
@@ -68,6 +68,12 @@ const ImportIssuesPanel = (props: ImportIssuesPanelProps) => {
     setWaitingMessage(waitingMessage);
     setColumnIndexesToColumnNames(importModel.getColumnIndexesToColumnNames());
     setColumnMappingSummary(buildColumnMappingSummary());
+    if (props.importIssuesCompletionState !== 'complete') {
+      setProgressInfo({
+        state: 'waiting',
+        percentComplete: 0
+      });
+    }
   }
 
   useEffect(() => {
@@ -79,10 +85,11 @@ const ImportIssuesPanel = (props: ImportIssuesPanelProps) => {
   }
 
   const onImportProgressUpdate = async (importCount: number, lineSkipCount: number, failCount: number, totalCount: number): Promise<void> => {
-    console.log(`ImportIssuesPanel.onImportProgressUpdate called with importCount = ${importCount}, lineSkipCount = ${lineSkipCount}, failCount = ${failCount}, totalCount = ${totalCount}`);
+    // console.log(`ImportIssuesPanel.onImportProgressUpdate called with importCount = ${importCount}, lineSkipCount = ${lineSkipCount}, failCount = ${failCount}, totalCount = ${totalCount}`);
+    const percentComplete = totalCount > 0 ? Math.round((importCount + lineSkipCount + failCount) / totalCount * 100) : 0;
     const progressInfo: ProgressInfo = {
-      state: 'in_progress',
-      percentComplete: totalCount > 0 ? Math.round((importCount + lineSkipCount + failCount) / totalCount * 100) : 0,
+      state: percentComplete === 100 ? 'complete' : 'in_progress',
+      percentComplete: percentComplete,
       message: `Imported ${importCount} of ${totalCount} (${lineSkipCount} skipped, ${failCount} failed)`
     };
     setProgressInfo(progressInfo);
@@ -92,7 +99,7 @@ const ImportIssuesPanel = (props: ImportIssuesPanelProps) => {
   }
 
   const onImportIssuesButtonClick = async () => {
-    console.log('ImportIssuesPanel.onImportIssuesButtonClick called');
+    // console.log('ImportIssuesPanel.onImportIssuesButtonClick called');
     const importInstructions: ImportInstructions = {
       targetProject: importModel.getSelectedProject(),
       targetIssueType: importModel.getSelectedIssueType(),
@@ -104,7 +111,7 @@ const ImportIssuesPanel = (props: ImportIssuesPanelProps) => {
   }
 
   const renderImportSummary = () => {
-    if (props.columnMappingCompletionState !== 'complete') {
+    if (props.columnMappingCompletionState !== 'complete' && props.importIssuesCompletionState !== 'complete') {
       return null;
     }
     const csvParseResult = importModel.getCsvParseResult();
@@ -163,7 +170,9 @@ const ImportIssuesPanel = (props: ImportIssuesPanelProps) => {
       {renderPanelMessage(waitingMessage)}
       {renderImportSummary()}
       {renderImportButton()}
-      {renderProgressIndicator()}
+      <FormSection>
+        {renderProgressIndicator()}
+      </FormSection>
     </div>
   )
 
