@@ -16,8 +16,6 @@ modules:
         - title: Bulk Import Work Items
           route: import
   function:
-    - key: upload-csv-fn
-      handler: fileUploadHandler.onFileUpload
     - key: global-resolver-fn
       handler: resolver.handler
 resources:
