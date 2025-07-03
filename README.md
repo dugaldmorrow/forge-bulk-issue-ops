@@ -14,6 +14,10 @@ The following screenshot illustrates the app with its support for rendering in l
 
 ![Screenshot of the Forge Bulk Issue Operations app](./image/bulk-edit-light-dark-mode.png)
 
+# Architecture
+
+An overview of the major components of the app is provided in [Architecture.md](./Architecture.md).
+
 ## Setup
 
 See [Set up Forge](https://developer.atlassian.com/platform/forge/set-up-forge/) for instructions to get set up.
