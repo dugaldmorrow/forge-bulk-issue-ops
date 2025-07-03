@@ -3,6 +3,7 @@ import { CompletionState } from 'src/types/CompletionState';
 import SuccessSymbol from './SuccessSymbol';
 import TodoSymbol from './TodoSymbol';
 import ExpandIcon from './ExpandIcon';
+import { enablePanelExpansion } from 'src/extension/bulkOperationStaticRules';
 
 export type PanelHeaderProps = {
   stepNumber: number;
@@ -18,7 +19,7 @@ const PanelHeader = (props: PanelHeaderProps) => {
       <div className='panel-header'>
         <div><h3>Step {props.stepNumber}</h3></div>
         <div className='panel-header-icons'>
-          {props.onExpandToggle && (
+          {enablePanelExpansion && props.onExpandToggle && (
             <ExpandIcon
               isExpanded={props.isExpanded || false}
               onClick={props.onExpandToggle}

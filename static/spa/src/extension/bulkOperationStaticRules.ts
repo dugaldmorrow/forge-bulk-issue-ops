@@ -106,3 +106,11 @@ export const optionalFieldNamesToIncludeInMoves: string[] = [
   // 'Fix versions'
 ]
 
+/**
+ * This constant determines whether step panels can be expanded to full-screen overlays.
+ * When enabled, users can click an expand icon in each panel header to view the panel
+ * content in a larger overlay that occupies most of the screen. This is particularly
+ * useful for panels with complex content or when working on smaller screens.
+ */
+export const enablePanelExpansion = true;
+

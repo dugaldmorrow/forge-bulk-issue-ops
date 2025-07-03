@@ -18,7 +18,7 @@ import FieldMappingPanel, { FieldMappingsState, nilFieldMappingsState } from './
 import targetProjectFieldsModel from 'src/controller/TargetProjectFieldsModel';
 import { IssueSelectionPanel } from '../widget/IssueSelectionPanel';
 import bulkOperationRuleEnforcer from 'src/extension/bulkOperationRuleEnforcer';
-import { allowBulkEditsFromMultipleProjects, allowBulkMovesFromMultipleProjects, subtaskMoveStrategy, enableTheAbilityToBulkChangeResolvedIssues, advancedFilterModeEnabled, filterModeDefault, showLabelsSelect } from '../extension/bulkOperationStaticRules';
+import { allowBulkEditsFromMultipleProjects, allowBulkMovesFromMultipleProjects, subtaskMoveStrategy, enableTheAbilityToBulkChangeResolvedIssues, advancedFilterModeEnabled, filterModeDefault, showLabelsSelect, enablePanelExpansion } from '../extension/bulkOperationStaticRules';
 import { BulkOperationMode } from 'src/types/BulkOperationMode';
 import IssueTypeMappingPanel from './IssueTypeMappingPanel';
 import { ObjectMapping } from 'src/types/ObjectMapping';
@@ -133,10 +133,12 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   }
 
   const handlePanelExpand = (stepName: StepName) => {
+    if (!enablePanelExpansion) return;
     setExpandedPanel(expandedPanel === stepName ? null : stepName);
   }
 
   const handleOverlayClick = (e: React.MouseEvent) => {
+    if (!enablePanelExpansion) return;
     if (e.target === e.currentTarget) {
       setExpandedPanel(null);
     }
@@ -144,6 +146,8 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
 
   // Handle keyboard events for accessibility
   useEffect(() => {
+    if (!enablePanelExpansion) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (expandedPanel && e.key === 'Escape') {
         setExpandedPanel(null);
@@ -166,7 +170,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
 
   const renderExpandablePanel = (stepName: StepName, stepNumber: number, label: string, children: React.ReactNode) => {
     const completionState = getRenderingStepCompletionState(stepName);
-    const isExpanded = expandedPanel === stepName;
+    const isExpanded = enablePanelExpansion && expandedPanel === stepName;
     
     const panelContent = (
       <div className="content-panel">
@@ -175,13 +179,13 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
           label={label}
           completionState={completionState}
           isExpanded={isExpanded}
-          onExpandToggle={() => handlePanelExpand(stepName)}
+          onExpandToggle={enablePanelExpansion ? () => handlePanelExpand(stepName) : undefined}
         />
         {children}
       </div>
     );
 
-    if (isExpanded) {
+    if (enablePanelExpansion && isExpanded) {
       return (
         <div className="panel-overlay" onClick={handleOverlayClick}>
           <div className="panel-expanded">
@@ -997,7 +1001,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       <h3>Bulk {bulkOperationMode} Work Items</h3>
       {showCompletionStateDebug ? renderStepCompletionState() : null}
       {rendermainWarningMessage()}
-      <div className={`bulk-move-main-panel ${expandedPanel ? 'has-expanded-panel' : ''}`}>
+      <div className={`bulk-move-main-panel ${enablePanelExpansion && expandedPanel ? 'has-expanded-panel' : ''}`}>
         {isStepApplicableToBulkOperationMode('file-upload') ? renderFileUploadPanel(lastStepNumber++) : null}
         {isStepApplicableToBulkOperationMode('project-and-issue-type-selection') ? renderProjectAndIssueTypeSelectionPanel(lastStepNumber++) : null}
         {isStepApplicableToBulkOperationMode('column-mapping') ? renderColumnMappingPanel(lastStepNumber++) : null}
