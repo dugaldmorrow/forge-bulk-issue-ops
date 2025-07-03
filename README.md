@@ -14,9 +14,10 @@ The following screenshot illustrates the app with its support for rendering in l
 
 ![Screenshot of the Forge Bulk Issue Operations app](./image/bulk-edit-light-dark-mode.png)
 
-# Architecture
+# Documentation
 
-An overview of the major components of the app is provided in [Architecture.md](./Architecture.md).
+* An overview of the major components of the app is provided in [Architecture.md](./documentation/Architecture.md).
+* An examplanation of how the state of step completion is managed is provided in [StepCompletionStateManagement.md](./documentation/StepCompletionStateManagement.md).
 
 ## Setup
 
