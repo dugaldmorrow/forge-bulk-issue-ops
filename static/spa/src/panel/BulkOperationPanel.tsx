@@ -83,6 +83,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   const [fieldIdsToValuesTime, setFieldIdsToValuesTime] = React.useState<number>(0);
   const [fieldMappingsComplete, setFieldMappingsComplete] = useState<boolean>(false);
   const [debugInfo, setDebugInfo] = useState<DebugInfo>({ projects: [], issueTypes: [] });
+  const [expandedPanel, setExpandedPanel] = useState<StepName | null>(null);
 
   // Don't use the following to trigger rendering. i.e. child components shouldn't have a useEffect dependent on this.
   const fieldMappingsState = useRef<FieldMappingsState>(nilFieldMappingsState);
@@ -129,6 +130,72 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
 
   const onModelUpdateChange = (modelUpdateTimestamp: number) => {
     setLastModelUpdateTime(modelUpdateTimestamp);
+  }
+
+  const handlePanelExpand = (stepName: StepName) => {
+    setExpandedPanel(expandedPanel === stepName ? null : stepName);
+  }
+
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      setExpandedPanel(null);
+    }
+  }
+
+  // Handle keyboard events for accessibility
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (expandedPanel && e.key === 'Escape') {
+        setExpandedPanel(null);
+      }
+    };
+
+    if (expandedPanel) {
+      document.addEventListener('keydown', handleKeyDown);
+      // Prevent body scroll when panel is expanded
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [expandedPanel]);
+
+  const renderExpandablePanel = (stepName: StepName, stepNumber: number, label: string, children: React.ReactNode) => {
+    const completionState = getRenderingStepCompletionState(stepName);
+    const isExpanded = expandedPanel === stepName;
+    
+    const panelContent = (
+      <div className="content-panel">
+        <PanelHeader
+          stepNumber={stepNumber}
+          label={label}
+          completionState={completionState}
+          isExpanded={isExpanded}
+          onExpandToggle={() => handlePanelExpand(stepName)}
+        />
+        {children}
+      </div>
+    );
+
+    if (isExpanded) {
+      return (
+        <div className="panel-overlay" onClick={handleOverlayClick}>
+          <div className="panel-expanded">
+            {panelContent}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={`padding-panel ${isExpanded ? 'expanded' : ''}`}>
+        {panelContent}
+      </div>
+    );
   }
 
   const setIssueMoveOutcome = (issueMoveOutcome: undefined | TaskOutcome) => {
@@ -550,21 +617,40 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
 
   const renderFileUploadPanel = (stepNumber: number) => {
     const completionState = getRenderingStepCompletionState('file-upload');
-    return (
-      <div className="padding-panel">
-        <div className="content-panel">
-          <PanelHeader
-            stepNumber={stepNumber}
-            label={`File upload`}
+    const stepName: StepName = 'file-upload';
+    const isExpanded = expandedPanel === stepName;
+    
+    const panelContent = (
+      <div className="content-panel">
+        <PanelHeader
+          stepNumber={stepNumber}
+          label={`File upload`}
+          completionState={completionState}
+          isExpanded={isExpanded}
+          onExpandToggle={() => handlePanelExpand(stepName)}
+        />
+        <div className="step-panel-content-container">
+          <FileUploadPanel
+            disabled={!bulkImportEnabled}
             completionState={completionState}
           />
-          <div className="step-panel-content-container">
-            <FileUploadPanel
-              disabled={!bulkImportEnabled}
-              completionState={completionState}
-            />
+        </div>
+      </div>
+    );
+
+    if (isExpanded) {
+      return (
+        <div className="panel-overlay" onClick={handleOverlayClick}>
+          <div className="panel-expanded">
+            {panelContent}
           </div>
         </div>
+      );
+    }
+
+    return (
+      <div className={`padding-panel ${isExpanded ? 'expanded' : ''}`}>
+        {panelContent}
       </div>
     );
   }
@@ -572,91 +658,87 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
   const renderProjectAndIssueTypeSelectionPanel = (stepNumber: number) => {
     const fileUploadCompletionState = getRenderingStepCompletionState('file-upload');
     const projectAndIssueTypeSelectionCompletionState = getRenderingStepCompletionState('project-and-issue-type-selection');
-    return (
-      <div className="padding-panel">
-        <div className="content-panel">
-          <PanelHeader
-            stepNumber={stepNumber}
-            label={`Target project selection`}
-            completionState={projectAndIssueTypeSelectionCompletionState}
-          />
-          <div className="step-panel-content-container">
-            <ImportProjectAndIssueTypeSelectionPanel
-              fileUploadCompletionState={fileUploadCompletionState}
-              projectAndIssueTypeSelectionCompletionState={projectAndIssueTypeSelectionCompletionState}
-              modelUpdateTimestamp={modelUpdateTimestamp}
-            />
-          </div>
-        </div>
+    
+    return renderExpandablePanel('project-and-issue-type-selection', stepNumber, 'Target project selection', (
+      <div className="step-panel-content-container">
+        <ImportProjectAndIssueTypeSelectionPanel
+          fileUploadCompletionState={fileUploadCompletionState}
+          projectAndIssueTypeSelectionCompletionState={projectAndIssueTypeSelectionCompletionState}
+          modelUpdateTimestamp={modelUpdateTimestamp}
+        />
       </div>
-    );
+    ));
   }
 
   const renderColumnMappingPanel = (stepNumber: number) => {
     const importProjectCompletionState = getRenderingStepCompletionState('project-and-issue-type-selection');
     const columnMappingCompletionState = getRenderingStepCompletionState('column-mapping');
-    return (
-      <div className="padding-panel">
-        <div className="content-panel">
-          <PanelHeader
-            stepNumber={stepNumber}
-            label={`Column mapping`}
-            completionState={columnMappingCompletionState}
-          />
-          <div className="step-panel-content-container">
-            <ImportColumnMappingPanel
-              importProjectCompletionState={importProjectCompletionState}
-              columnMappingCompletionState={columnMappingCompletionState}
-              selectedIssueType={importModel.getSelectedIssueType()}
-              createIssueMetadata={importModel.getSelectedProjectCreateIssueMetadata()}
-              modelUpdateTimestamp={modelUpdateTimestamp}
-            />
-          </div>
-        </div>
+    
+    return renderExpandablePanel('column-mapping', stepNumber, 'Column mapping', (
+      <div className="step-panel-content-container">
+        <ImportColumnMappingPanel
+          importProjectCompletionState={importProjectCompletionState}
+          columnMappingCompletionState={columnMappingCompletionState}
+          selectedIssueType={importModel.getSelectedIssueType()}
+          createIssueMetadata={importModel.getSelectedProjectCreateIssueMetadata()}
+          modelUpdateTimestamp={modelUpdateTimestamp}
+        />
       </div>
-    );
+    ));
   }
 
   const renderImportIssuesPanel = (stepNumber: number) => {
     const columnMappingCompletionState = getRenderingStepCompletionState('column-mapping');
     const importIssuesCompletionState = getRenderingStepCompletionState('import-issues');
-    return (
-      <div className="padding-panel">
-        <div className="content-panel">
-          <PanelHeader
-            stepNumber={stepNumber}
-            label={`Import work items`}
-            completionState={importIssuesCompletionState}
-          />
-          <div className="step-panel-content-container">
-            <ImportIssuesPanel
-              columnMappingCompletionState={columnMappingCompletionState}
-              importIssuesCompletionState={importIssuesCompletionState}
-              modelUpdateTimestamp={modelUpdateTimestamp}
-            />
-          </div>
-        </div>
+    
+    return renderExpandablePanel('import-issues', stepNumber, 'Import work items', (
+      <div className="step-panel-content-container">
+        <ImportIssuesPanel
+          columnMappingCompletionState={columnMappingCompletionState}
+          importIssuesCompletionState={importIssuesCompletionState}
+          modelUpdateTimestamp={modelUpdateTimestamp}
+        />
       </div>
-    );
+    ));
   }
 
   const renderFilterPanel = (stepNumber: number) => {
-    return (
-      <div className="padding-panel">
-        <div className="content-panel">
-          <PanelHeader
-            stepNumber={stepNumber}
-            label={`Find work items to ${bulkOperationMode.toLowerCase()}`}
-            completionState={getRenderingStepCompletionState('filter')}
-          />
-          <FilterPanel
-            bulkOperationMode={bulkOperationMode}
-            allIssueTypes={allIssueTypes}
-            selectAllIssueTypesWhenNoneAreSelected={selectAllIssueTypesWhenNoneAreSelected}
-            onIssueSearchInitiated={onIssueSearchInitiated}
-            onIssueSearchCompleted={onIssueSearchCompleted}
-          />
+    const completionState = getRenderingStepCompletionState('filter');
+    const stepName: StepName = 'filter';
+    const isExpanded = expandedPanel === stepName;
+    
+    const panelContent = (
+      <div className="content-panel">
+        <PanelHeader
+          stepNumber={stepNumber}
+          label={`Find work items to ${bulkOperationMode.toLowerCase()}`}
+          completionState={completionState}
+          isExpanded={isExpanded}
+          onExpandToggle={() => handlePanelExpand(stepName)}
+        />
+        <FilterPanel
+          bulkOperationMode={bulkOperationMode}
+          allIssueTypes={allIssueTypes}
+          selectAllIssueTypesWhenNoneAreSelected={selectAllIssueTypesWhenNoneAreSelected}
+          onIssueSearchInitiated={onIssueSearchInitiated}
+          onIssueSearchCompleted={onIssueSearchCompleted}
+        />
+      </div>
+    );
+
+    if (isExpanded) {
+      return (
+        <div className="panel-overlay" onClick={handleOverlayClick}>
+          <div className="panel-expanded">
+            {panelContent}
+          </div>
         </div>
+      );
+    }
+
+    return (
+      <div className={`padding-panel ${isExpanded ? 'expanded' : ''}`}>
+        {panelContent}
       </div>
     );
   }
@@ -671,25 +753,44 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       .addCheck(arePrerequisiteStepsComplete('issue-selection', true), 'Waiting for previous step to be completed.')
       .build();
     let panelLabel = `Select work items to ${bulkOperationMode.toLowerCase()}`;
-    // console.log(`BulkOperationPanel.renderIssuesPanel: issue selection state = ${selectionToString(issueSelectionState)}`);
-    return (
-      <div className="padding-panel">
-        <div className="content-panel">
-          <PanelHeader
-            stepNumber={stepNumber}
-            label={panelLabel}
-            completionState={getRenderingStepCompletionState('issue-selection')}
-          />
-          {renderPanelMessage(waitingMessage, {marginTop: '20px', marginBottom: '20px'})}
-          <IssueSelectionPanel
-            loadingState={issueLoadingState}
-            issueSearchInfo={issueSearchInfo}
-            selectedIssues={issueSelectionState.selectedIssues}
-            bulkOperationMode={bulkOperationMode}
-            computeSelectionValidity={computeSelectionValidity}
-            onIssuesSelectionChange={onIssuesSelectionChange}
-          />
+    const completionState = getRenderingStepCompletionState('issue-selection');
+    const stepName: StepName = 'issue-selection';
+    const isExpanded = expandedPanel === stepName;
+    
+    const panelContent = (
+      <div className="content-panel">
+        <PanelHeader
+          stepNumber={stepNumber}
+          label={panelLabel}
+          completionState={completionState}
+          isExpanded={isExpanded}
+          onExpandToggle={() => handlePanelExpand(stepName)}
+        />
+        {renderPanelMessage(waitingMessage, {marginTop: '20px', marginBottom: '20px'})}
+        <IssueSelectionPanel
+          loadingState={issueLoadingState}
+          issueSearchInfo={issueSearchInfo}
+          selectedIssues={issueSelectionState.selectedIssues}
+          bulkOperationMode={bulkOperationMode}
+          computeSelectionValidity={computeSelectionValidity}
+          onIssuesSelectionChange={onIssuesSelectionChange}
+        />
+      </div>
+    );
+
+    if (isExpanded) {
+      return (
+        <div className="panel-overlay" onClick={handleOverlayClick}>
+          <div className="panel-expanded">
+            {panelContent}
+          </div>
         </div>
+      );
+    }
+
+    return (
+      <div className={`padding-panel ${isExpanded ? 'expanded' : ''}`}>
+        {panelContent}
       </div>
     );
   }
@@ -714,19 +815,13 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       .addCheck(arePrerequisiteStepsComplete('target-project-selection', true), 'Waiting for previous steps to be completed.')
       .addCheck(issueSelectionState.selectionValidity === 'valid', 'A valid set of work items has not yet been selected.')
       .build();
-    return (
-      <div className="padding-panel">
-        <div className="content-panel">
-          <PanelHeader
-            stepNumber={stepNumber}
-            label="Select target project"
-            completionState={getStepCompletionState('target-project-selection', true)}
-          />
-          {renderPanelMessage(waitingMessage, {marginTop: '20px', marginBottom: '20px'})}
-          {renderToProjectSelect()}
-        </div>
-      </div>
-    );
+    
+    return renderExpandablePanel('target-project-selection', stepNumber, 'Select target project', (
+      <>
+        {renderPanelMessage(waitingMessage, {marginTop: '20px', marginBottom: '20px'})}
+        {renderToProjectSelect()}
+      </>
+    ));
   }
 
   const renderStartFieldMappingButton = () => {
@@ -745,29 +840,22 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
     const waitingMessage = new WaitingMessageBuilder()
       .addCheck(arePrerequisiteStepsComplete('issue-type-mapping', true), 'Waiting for previous steps to be completed.')
       .build();
-    return (
-      <div className="padding-panel">
-        <div className="content-panel">
-          <PanelHeader
-            stepNumber={stepNumber}
-            label="Work item type mapping"
-            // completionState={'incomplete'}
-            completionState={getRenderingStepCompletionState('issue-type-mapping')}
-          />
-          {renderPanelMessage(waitingMessage, {marginTop: '20px', marginBottom: '20px'})}
-          {renderStartFieldMappingButton()}
-          {renderFieldMappingIndicator()}
-          <IssueTypeMappingPanel
-            allIssueTypes={allIssueTypes}
-            issueSelectionState={issueSelectionState}
-            targetProject={selectedToProject}
-            bulkOperationMode={bulkOperationMode}
-            filterIssueTypes={bulkOperationRuleEnforcer.filterIssueTypes}
-            onIssueTypeMappingChange={onIssueTypeMappingChange}
-          />
-        </div>
-      </div>
-    );
+    
+    return renderExpandablePanel('issue-type-mapping', stepNumber, 'Work item type mapping', (
+      <>
+        {renderPanelMessage(waitingMessage, {marginTop: '20px', marginBottom: '20px'})}
+        {renderStartFieldMappingButton()}
+        {renderFieldMappingIndicator()}
+        <IssueTypeMappingPanel
+          allIssueTypes={allIssueTypes}
+          issueSelectionState={issueSelectionState}
+          targetProject={selectedToProject}
+          bulkOperationMode={bulkOperationMode}
+          filterIssueTypes={bulkOperationRuleEnforcer.filterIssueTypes}
+          onIssueTypeMappingChange={onIssueTypeMappingChange}
+        />
+      </>
+    ));
   }
 
   const renderFieldValueMappingsPanel = (stepNumber: number) => {
@@ -776,50 +864,34 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       .build();
     const issueTypeMappingStepCompletionState = getRenderingStepCompletionState('issue-type-mapping');
     const fieldMappingCompletionState = getRenderingStepCompletionState('field-mapping');
-    return (
-      <div className="padding-panel">
-        <div className="content-panel">
-          <PanelHeader
-            key={`field-mapping-panel-${selectedToProjectTime}-${fieldMappingCompletionState}`}
-            stepNumber={stepNumber}
-            label={`Map work item field values`}
-            completionState={fieldMappingCompletionState}
-          />
-          {renderPanelMessage(waitingMessage, {marginTop: '20px', marginBottom: '20px'})}
-          {renderStartFieldMappingButton()}
-          {renderFieldMappingIndicator()}
-          <FieldMappingPanel
-            bulkOperationMode={bulkOperationMode}
-            issueTypeMappingStepCompletionState={issueTypeMappingStepCompletionState}
-            allIssueTypes={allIssueTypes}
-            issues={issueSelectionState.selectedIssues}
-            targetProject={selectedToProject}
-            fieldMappingsState={fieldMappingsState.current}
-            showDebug={showDebug}
-            onAllDefaultValuesProvided={onAllDefaultValuesProvided}
-          />
-        </div>
-      </div>
-    );
+    
+    return renderExpandablePanel('field-mapping', stepNumber, 'Map work item field values', (
+      <>
+        {renderPanelMessage(waitingMessage, {marginTop: '20px', marginBottom: '20px'})}
+        {renderStartFieldMappingButton()}
+        {renderFieldMappingIndicator()}
+        <FieldMappingPanel
+          bulkOperationMode={bulkOperationMode}
+          issueTypeMappingStepCompletionState={issueTypeMappingStepCompletionState}
+          allIssueTypes={allIssueTypes}
+          issues={issueSelectionState.selectedIssues}
+          targetProject={selectedToProject}
+          fieldMappingsState={fieldMappingsState.current}
+          showDebug={showDebug}
+          onAllDefaultValuesProvided={onAllDefaultValuesProvided}
+        />
+      </>
+    ));
   }
 
   const renderEditFieldsPanel = (stepNumber: number) => {
-    return (
-      <div className="padding-panel">
-        <div className="content-panel">
-          <PanelHeader
-            stepNumber={stepNumber}
-            label={`Set work item field values`}
-            completionState={getRenderingStepCompletionState('edit-fields')}
-          />
-          <FieldEditsPanel
-            issueSelectionState={issueSelectionState}
-            selectedIssuesTime={issueSearchInfoTime}
-            onEditsValidityChange={onEditsValidityChange}
-          />
-        </div>
-      </div>
-    );
+    return renderExpandablePanel('edit-fields', stepNumber, 'Set work item field values', (
+      <FieldEditsPanel
+        issueSelectionState={issueSelectionState}
+        selectedIssuesTime={issueSearchInfoTime}
+        onEditsValidityChange={onEditsValidityChange}
+      />
+    ));
   }
 
   const renderMoveOrEditPanel = (stepNumber: number) => {
@@ -828,27 +900,19 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       selectedIssuesTime,
       fieldIdsToValuesTime
     );
-    return (
-      <div className="padding-panel">
-        <div className="content-panel">
-          <PanelHeader
-            stepNumber={stepNumber}
-            label={`${bulkOperationMode} work items`}
-            completionState={getRenderingStepCompletionState('move-or-edit')}
-          />
-          <MoveOrEditPanel
-            bulkOperationMode={bulkOperationMode}
-            fieldMappingsComplete={fieldMappingsComplete}
-            issueSelectionState={issueSelectionState}
-            selectedToProject={selectedToProject}
-            allDefaultValuesProvided={allDefaultValuesProvided}
-            lastInputConditionsChangeTime={lastInputConditionsChangeTime}
-            onSetStepCompletionState={updateStepCompletionState}
-            onSetMainWarningMessage={setMainWarningMessage}
-          />
-        </div>
-      </div>
-    );
+    
+    return renderExpandablePanel('move-or-edit', stepNumber, `${bulkOperationMode} work items`, (
+      <MoveOrEditPanel
+        bulkOperationMode={bulkOperationMode}
+        fieldMappingsComplete={fieldMappingsComplete}
+        issueSelectionState={issueSelectionState}
+        selectedToProject={selectedToProject}
+        allDefaultValuesProvided={allDefaultValuesProvided}
+        lastInputConditionsChangeTime={lastInputConditionsChangeTime}
+        onSetStepCompletionState={updateStepCompletionState}
+        onSetMainWarningMessage={setMainWarningMessage}
+      />
+    ));
   }
 
 
@@ -933,7 +997,7 @@ const BulkOperationPanel = (props: BulkOperationPanelProps<any>) => {
       <h3>Bulk {bulkOperationMode} Work Items</h3>
       {showCompletionStateDebug ? renderStepCompletionState() : null}
       {rendermainWarningMessage()}
-      <div className="bulk-move-main-panel">
+      <div className={`bulk-move-main-panel ${expandedPanel ? 'has-expanded-panel' : ''}`}>
         {isStepApplicableToBulkOperationMode('file-upload') ? renderFileUploadPanel(lastStepNumber++) : null}
         {isStepApplicableToBulkOperationMode('project-and-issue-type-selection') ? renderProjectAndIssueTypeSelectionPanel(lastStepNumber++) : null}
         {isStepApplicableToBulkOperationMode('column-mapping') ? renderColumnMappingPanel(lastStepNumber++) : null}
