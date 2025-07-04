@@ -16,8 +16,17 @@ The following screenshot illustrates the app with its support for rendering in l
 
 # Documentation
 
-* An overview of the major components of the app is provided in [Architecture.md](./documentation/Architecture.md).
-* An examplanation of how the state of step completion is managed is provided in [StepCompletionStateManagement.md](./documentation/StepCompletionStateManagement.md).
+## Core Documentation
+* **[Architecture Overview](./documentation/Architecture.md)** - Overview of the major components and system design
+* **[Step Completion State Management](./documentation/StepCompletionStateManagement.md)** - Explanation of how workflow step completion is managed
+
+## Setup and Configuration
+* **[Configuration Instructions](./documentation/configuration-instructions.md)** - Detailed setup guide including environment variables, permissions, and security considerations
+
+## Enhancement Guides
+* **[Admin Enhancement Exercise](./documentation/admin-enhancement-exercise.md)** - Guide to adding a Jira admin page for configuring bulk operation settings using Forge UI Kit
+* **[Managing Bulk Permissions](./documentation/managing-bulk-permissions.md)** - Strategy for dynamic group enrollment to manage bulk operation permissions with basic authentication
+* **[Monitoring Enhancement Exercise](./documentation/monitoring-enhancement-exercise.md)** - Implementation guide for monitoring users left in the bulk-ops-app group with automated notifications
 
 ## Setup
 
