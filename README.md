@@ -23,79 +23,18 @@ The following screenshot illustrates the app with its support for rendering in l
 
 See [Set up Forge](https://developer.atlassian.com/platform/forge/set-up-forge/) for instructions to get set up.
 
-### Setup step 1: Installing the app
+## Quick Start
 
-The following are brief instructions to set up the app. For detailed instructions, visit https://developer.atlassian.com/platform/forge/getting-started/.
-
-- Register the app as your own:
-```
-cd [app-root-directory]
+```bash
 npm install
-```
-
-- Install app dependencies (backend and frontend):
-```
-cd [app-root-directory]
-npm install
-cd static/spa
-npm install
-```
-
-- Build your app's frontend:
-```
-cd [app-root-directory]
-cd static/spa
-npm run build
-```
-
-- Deploy your app by running:
-```
-cd [app-root-directory]
+cd static/spa && npm install && cd ../..
 forge deploy
-```
-
-- Install your app in an Atlassian site by running:
-```
-cd [app-root-directory]
 forge install
 ```
 
-### Setup step 2: Enable the app to perform bulk operations
+## Configuration
 
-Jira provides a global permission, called "Make bulk changes", to enable/disable the ability for users to make bulk changes. The standard configuration includes various roles, but administrators may change which roles are able to make bulk changes. To ensure the app continues to work, it is recommended that a role specific to the app be created and added to the "Make bulk changes" permission so that its purpose and association with the app is obvious.
-
-1. Create a group called "bulk-ops-app" as follows:
-* Click "User management" from the settings (cog) menu.
-* Click "Directory" and "Groups".
-* Click the "Create group" button.
-* Enter "bulk-ops-app" and the group name.
-* Click "Create" to create the group.
-
-2. Add the "bulk-ops-app" group to the "Make bulk changes" global permission as follows:
-* Visit Jira admin settings (https://your-tenant.atlassian.net/jira/settings/system/general-configuration).
-* Visit "Global permissions" within the "Security" section.
-* In the "Grant Permission" section, select "Grant: Make bulk changes: and "Group: bulk-ops-app". 
-
-Once this is done, you should see the "bulk-ops-app" appear alongside the "Make bulk changes" global permission. When testing the app, it is recommended for this to be the only permission, but in a production environment, you will likely also want to allow administrators to have bulk change permissions.
-
-![Make bulk changes configuration](./make-bulk-changes-global-permission.png)
-
-
-### Setup step 3: Configure environment variables
-
-In order for the app to be able to make bulk changes as the user requeting the changes, the app needs to add the requesting user into the "bulk-ops-app" group before the request is submitted and then remove the user from the group afterwards. Details about these environment variables are provided in [src/userManagementConfig.ts](./src/userManagementConfig.ts). To configure them:
-
-1. Copy `scripts/setup-forge-environment-template` to `setup-forge-[env]-environment-private.sh` where `[env]` refers to one of your environments. An example would be `setup-forge-development-environment-private.sh`. Note that the `-private` part of the file name is necessary to prevent the file being checked into GIT and consequently disclosing private information.
-2. Replace the values within `setup-forge-[env]-environment-private.sh` within square brackets with values for your configuration.
-3. Run `./scripts/setup-forge-[env]-environment-private.sh`.
-
-### Setup step 4: Optionally prevent regular users from using Jira's built-in bulk operations
-
-This optional step involves reviewing and tuning the access to Jira's built-in bulk operations. Visit the Jira administration global permissions section, and review the permissions corresponding to "Make bulk changes".
-
-### Setup step 5: Optionally reduce external permissions
-
-To support any customer, the app declares the backend external permission `*.atlassian.net` in order for it to make basic auth requests to the Jira REST API. This can be secured further to only allow requests to the domains your instance of the app will be running on. For example, `your-tenant-stage.atlassian.net` and `your-tenant.atlassian.net`.
+For detailed configuration instructions including environment variables, permissions setup, and security considerations, see [Configuration Instructions](documentation/configuration-instructions.md).
 
 
 ### Development Loop
@@ -119,9 +58,6 @@ The app is designed to be support tailoring to an organisation's specific needs,
 
 Static configuration rules are defined as constants in `static/spa/extension/bulkOperationStaticRules.ts`.
 
-# Additional configuration options
-
-Configuration options can be defined in [static/spa/src/model/config.ts](static/spa/src/model/config.ts), but be careful modifying these options.
 
 # Known issues
 
