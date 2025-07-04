@@ -1,8 +1,12 @@
 # Admin Enhancement Exercise: Jira Admin Page for Bulk Operations Settings
 
+## Note
+
+This exercise in AI generated and had little review. Consequentally, the exercise may containe mistakes, but let's treat that as a *feature* of the exercise.
+
 ## Overview
 
-This exercise outlines the steps to add a Jira admin page that allows administrators to configure the static settings defined in `bulkOperationStaticRules.ts`. The solution uses Forge UI Kit for the admin interface, Forge Key-Value Store for persistence, and a new resolver function to provide settings access to the CustomUI frontend.
+This exercise outlines the steps to add a Jira admin page that allows administrators to configure the static settings defined in `bulkOperationStaticRules.ts`. The solution described uses Forge UI Kit for the admin interface, Forge Key-Value Store for persistence, and a new resolver function to provide settings access to the CustomUI frontend.
 
 ## Architecture
 
