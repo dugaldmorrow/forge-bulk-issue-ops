@@ -1,12 +1,17 @@
 import React from 'react';
 import { Label } from '@atlaskit/form';
+import Tooltip from "@atlaskit/tooltip";
+import { components, OptionProps } from "@atlaskit/select"
 import { Option } from '../types/Option'
-import { RadioSelect } from '@atlaskit/select';
+import Select from '@atlaskit/select';
 import { CustomFieldOption } from 'src/types/CustomFieldOption';
 
 /*
   Select docs: https://atlassian.design/components/select/examples
 */
+
+// Minimum length of label to show tooltip
+const minimumLabelLengthForTooltip = 4;
 
 export type FieldValuesSelectProps = {
   label: string;
@@ -50,12 +55,43 @@ const FieldValuesSelect = (props: FieldValuesSelectProps) => {
     }
   }
 
+  const SelectContainer = ({
+    children,
+    ...props
+  }: any) => {
+    console.log(`SelectContainer props: ${JSON.stringify(props, null, 2)}`);
+    const currentValueLabel = props.selectProps && props.selectProps.value && props.selectProps.value.label ? props.selectProps.value.label : undefined;
+    return currentValueLabel && currentValueLabel.length > minimumLabelLengthForTooltip ? (
+      <Tooltip content={currentValueLabel} delay={0} position="auto">
+        <components.SelectContainer {...props}>
+          {children}
+        </components.SelectContainer>
+      </Tooltip>
+    ) : (
+      <components.SelectContainer {...props}>
+        {children}
+      </components.SelectContainer>
+    );
+  };
+
+  // See https://react-select.com/components
+  const Option = (props: OptionProps<any>) => {
+    const currentValueLabel = props.data && props.data.label ? props.data.label : undefined;
+    return currentValueLabel && currentValueLabel.length > minimumLabelLengthForTooltip ? (
+      <Tooltip content={currentValueLabel} position="auto">
+        <components.Option {...props} />
+      </Tooltip>
+    ) : (
+      <components.Option {...props} />
+    );
+  };
+
   const defaultValue = props.selectedCustomFieldOption ? customFieldOptionToOption(props.selectedCustomFieldOption) : undefined;
 
   return (
     <>
       {props.label ? <Label htmlFor="async-select-example">{props.label}</Label> : null}
-      <RadioSelect
+      <Select
         key={`field-options-select`}
         inputId="radio-select-example"
         testId="react-select"
@@ -66,10 +102,17 @@ const FieldValuesSelect = (props: FieldValuesSelectProps) => {
         options={options}
         placeholder={props.isRequired ? "Required field" : "Optional field"}
         menuPortalTarget={props.menuPortalTarget}
+        components={{ Option, SelectContainer }} // See https://react-select.com/components
+        styles={{
+          option: (base) => ({
+            ...base,
+          }),
+        }}
         onChange={onSingleSelectChange}
       />
     </>
   );
+  
 }
 
 export default FieldValuesSelect;
