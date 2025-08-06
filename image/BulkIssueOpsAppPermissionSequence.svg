@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 538.21 290.228" xmlns:bx="https://boxy-svg.com">
+  <g transform="matrix(1, 0, 0, 1, -13.879818, -275.368591)">
+    <g transform="matrix(1, 0, 0, 1, -0.027405, 0)">
+      <rect style="fill: rgb(130, 181, 53);" x="419.406" y="276.422" width="130.944" height="40.921" rx="6" ry="6"/>
+      <text style="fill: rgb(255, 255, 255); font-family: Arial, sans-serif; text-anchor: middle; white-space: pre; font-size: 16px;" x="484.878" y="302.572">Jira REST API</text>
+    </g>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, -199.735046, -106.053604)">
+    <rect style="fill: rgb(0, 82, 204);" x="200.328" y="107.107" width="130.944" height="40.921" rx="6" ry="6"/>
+    <text style="fill: rgb(255, 255, 255); font-family: Arial, sans-serif; text-anchor: middle; white-space: pre; font-size: 16px;" x="266.226" y="132.496">View</text>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, -94.15316, -0.610124)">
+    <path d="M 286.73 91.203 H 309.272 L 309.272 83.077 L 330.244 93.912 L 309.272 104.746 L 309.272 96.621 H 286.73 V 91.203 Z" bx:shape="arrow 286.73 83.077 43.514 21.669 5.418 20.972 0 1@db689046" style="fill: rgb(0, 82, 204);"/>
+    <rect x="174.702" y="88.78" width="136.843" height="10.264" style="fill: rgb(0, 82, 204);"/>
+  </g>
+  <rect x="56.743" y="40.101" width="14.024" height="209.103" style="fill: rgb(0, 82, 204);"/>
+  <text style="fill: rgb(0, 82, 204); font-family: Arial, sans-serif; font-size: 12px; font-weight: 700; text-anchor: middle; white-space: pre;" x="157.938" y="80.185">initiate bulk operation</text>
+  <rect x="242.9" y="41.348" width="14.024" height="207.757" style="fill: rgb(0, 82, 204);"/>
+  <rect x="465.56" y="41.6" width="14.024" height="210.335" style="fill: rgb(130, 181, 53);"/>
+  <g transform="matrix(1, 0, 0, 1, -6, -27)">
+    <path d="M 414.033 248.594 H 436.575 L 436.575 240.469 L 457.547 251.304 L 436.575 262.138 L 436.575 254.013 H 414.033 V 248.594 Z" bx:shape="arrow 414.033 240.469 43.514 21.669 5.418 20.972 0 1@6a0a1319" style="fill: rgb(191, 99, 243);"/>
+    <rect x="272.475" y="246.172" width="166.373" height="10.264" style="fill: rgb(191, 99, 243);"/>
+  </g>
+  <text style="fill: rgb(191, 99, 243); font-family: Arial, sans-serif; font-size: 12px; font-weight: 700; text-anchor: middle; white-space: pre;" x="359.011" y="112.824">add user to bulk ops group</text>
+  <text style="fill: rgb(191, 99, 243); font-family: Arial, sans-serif; font-size: 12px; font-weight: 700; text-anchor: middle; white-space: pre;" x="359.011" y="209.638">remove user from bulk ops group</text>
+  <text style="fill: rgb(0, 82, 204); font-family: Arial, sans-serif; font-size: 12px; font-weight: 700; text-anchor: middle; white-space: pre;" x="359.011" y="162.287">initiate bulk operation</text>
+  <g transform="matrix(1, 0, 0, 1, -69.482437, -77.357117)">
+    <path d="M 477.515 248.594 H 500.057 L 500.057 240.469 L 521.029 251.303 L 500.057 262.138 L 500.057 254.012 H 477.515 V 248.594 Z" bx:shape="arrow 477.515 240.469 43.514 21.669 5.418 20.972 0 1@09df1d9c" style="fill: rgb(0, 82, 204);"/>
+    <rect x="335.957" y="246.172" width="166.373" height="10.264" style="fill: rgb(0, 82, 204);"/>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, -6, -4)">
+    <path d="M 414.033 129.219 H 436.575 L 436.575 121.094 L 457.547 131.929 L 436.575 142.763 L 436.575 134.638 H 414.033 V 129.219 Z" bx:shape="arrow 414.033 121.094 43.514 21.669 5.418 20.972 0 1@f12ccbe4" style="fill: rgb(191, 99, 243);"/>
+    <rect x="272.475" y="126.797" width="166.373" height="10.264" style="fill: rgb(191, 99, 243);"/>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, -0.360567, -46.568195)">
+    <rect x="137.597" y="322.475" width="14.72" height="12.71" style="fill: rgb(191, 99, 243);"/>
+    <rect x="137.841" y="306.505" width="14.72" height="12.71" style="fill: rgb(0, 82, 204);"/>
+    <text style="fill: rgb(0, 82, 204); font-family: Arial, sans-serif; font-size: 12px; font-weight: 700; white-space: pre;" x="157.702" y="316.981">Forge API request as the current user</text>
+    <text style="fill: rgb(191, 99, 243); font-family: Arial, sans-serif; font-size: 12px; font-weight: 700; white-space: pre;" x="157.702" y="332.961">Basic auth request as service account</text>
+  </g>
+  <g transform="matrix(1, 0, 0, 1, -6, -3)">
+    <rect style="fill: rgb(0, 82, 204);" x="188.489" y="4.053" width="130.944" height="40.921" rx="6" ry="6"/>
+    <text style="fill: rgb(255, 255, 255); font-family: Arial, sans-serif; text-anchor: middle; white-space: pre; font-size: 16px;" x="254.387" y="24.442">Resolver</text>
+    <text style="fill: rgb(255, 255, 255); font-family: Arial, sans-serif; font-size: 11px; font-weight: 700; text-anchor: middle; white-space: pre;" x="255.161" y="37.068">(Forge function)</text>
+  </g>
+</svg>

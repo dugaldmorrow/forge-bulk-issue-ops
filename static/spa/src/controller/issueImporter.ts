@@ -116,7 +116,8 @@ const createIssue = async (createIssuePayload: CreateIssuePayload, attemptNumber
       await delay(secondsToDelay * 1000);
       return createIssue(createIssuePayload, attemptNumber + 1, allowedRetryCount - 1);
     } else {
-      console.warn(`Failed to create issue. Status: ${status}`);
+      const errorMessage = await response.text();
+      console.warn(`Failed to create issue. Status: ${status} - ${errorMessage}`);
       return undefined;
     }
   }
